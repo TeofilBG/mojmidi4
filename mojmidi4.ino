@@ -3,9 +3,10 @@
 #include "HC4067.h"
 #include <ResponsiveAnalogRead.h>
 #include <AiEsp32RotaryEncoder.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include <Fonts/Org_01.h>
+#include <U8g2lib.h>
+#ifdef U8X8_HAVE_HW_I2C
+#include <Wire.h>
+#endif
 
 // Set to 1 to enable Serial debug output
 #define DEBUG 0
@@ -76,10 +77,8 @@ int encoder1Values[4] = {64, 64, 64, 64};
 int encoder2Values[4] = {64, 64, 64, 64};
 
 // OLED Display Setup
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 32
-#define OLED_RESET    -1
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+#define OLED_I2C_ADDRESS 0x3C
+U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
 
 // Track what's currently shown to avoid redundant redraws
 int lastDisplayChannel = -1;
@@ -111,28 +110,26 @@ void printChannelAndEncoders(int channel, int enc1Value, int enc2Value) {
   lastDisplayEnc1 = enc1Value;
   lastDisplayEnc2 = enc2Value;
 
-  display.clearDisplay();
+  char channelText[6];
+  char enc1Text[13];
+  char enc2Text[13];
+  snprintf(channelText, sizeof(channelText), "CH:%02d", channel);
+  snprintf(enc1Text, sizeof(enc1Text), "ENC1:%d", enc1Value);
+  snprintf(enc2Text, sizeof(enc2Text), "ENC2:%d", enc2Value);
 
-  display.setCursor(24, 0);
-  display.setTextSize(1);
-  display.print("EUCALIPTUS MIDI");
+  display.clearBuffer();
 
-  display.setCursor(38, 9);
-  display.setTextSize(2);
-  display.print("CH:");
-  if (channel < 9) display.print("0");
-  display.print(channel);
-  display.setTextSize(1);
+  display.setFont(u8g2_font_5x7_tf);
+  display.drawStr(24, 7, "EUCALIPTUS MIDI");
 
-  display.setCursor(1, 25);
-  display.print("ENC1:");
-  display.print(enc1Value);
+  display.setFont(u8g2_font_10x20_tf);
+  display.drawStr(38, 23, channelText);
 
-  display.setCursor(86, 25);
-  display.print("ENC2:");
-  display.print(enc2Value);
+  display.setFont(u8g2_font_5x7_tf);
+  display.drawStr(1, 31, enc1Text);
+  display.drawStr(86, 31, enc2Text);
 
-  display.display();
+  display.sendBuffer();
 }
 
 // Read a single potentiometer sample via the mux (ResponsiveAnalogRead handles smoothing)
@@ -181,12 +178,12 @@ void setup() {
   rotaryEncoder2.setAcceleration(100);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+  display.setI2CAddress(OLED_I2C_ADDRESS * 2);
+  if (!display.begin()) {
     Serial.println(F("SSD1306 allocation failed"));
     for (;;);
   }
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
+  display.clearBuffer();
   printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
 }
 
