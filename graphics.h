@@ -12,6 +12,12 @@ namespace Graphics {
   const uint8_t ENC1_X = 1;
   const uint8_t ENC2_X = 86;
   const uint8_t ENCODER_Y = 31;
+  const uint8_t EDIT_LABEL_X = 1;
+  const uint8_t EDIT_LABEL_Y = 18;
+  const uint8_t EDIT_NOTE_X = 82;
+  const uint8_t EDIT_NOTE_Y = 23;
+  const uint8_t EDIT_STATUS_X = 1;
+  const uint8_t EDIT_STATUS_Y = 31;
 
   inline void drawStatusScreen(U8G2 &oled, const char *channelText, const char *enc1Text, const char *enc2Text) {
     oled.clearBuffer();
@@ -25,6 +31,21 @@ namespace Graphics {
     oled.setFont(u8g2_font_5x7_tf);
     oled.drawStr(ENC1_X, ENCODER_Y, enc1Text);
     oled.drawStr(ENC2_X, ENCODER_Y, enc2Text);
+
+    oled.sendBuffer();
+  }
+
+  inline void drawMidiNoteEditScreen(U8G2 &oled, const char *noteText, const char *statusText) {
+    oled.clearBuffer();
+
+    oled.setFont(u8g2_font_6x12_tf);
+    oled.drawStr(EDIT_LABEL_X, EDIT_LABEL_Y, "MIDI note");
+
+    oled.setFont(u8g2_font_10x20_tf);
+    oled.drawStr(EDIT_NOTE_X, EDIT_NOTE_Y, noteText);
+
+    oled.setFont(u8g2_font_5x7_tf);
+    oled.drawStr(EDIT_STATUS_X, EDIT_STATUS_Y, statusText);
 
     oled.sendBuffer();
   }

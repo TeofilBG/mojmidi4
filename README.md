@@ -11,6 +11,14 @@ Install these Arduino libraries before compiling:
 - `ResponsiveAnalogRead`
 - `AiEsp32RotaryEncoder`
 
+
+## MIDI note edit mode
+
+Long-press encoder button 2 to enter or exit MIDI note edit mode. In this mode,
+turn encoder 2 to choose a MIDI note from 21 to 108, press one of the 16 mux
+buttons to assign the selected note to that pad, and single-press encoder button
+2 to save the current mux note assignments to ESP32 non-volatile memory.
+
 This sketch is intended to be compiled from a folder that contains **one** active
 `.ino` file: `mojmidi4.ino`.
 
