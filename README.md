@@ -1,5 +1,16 @@
 # mojmidi4 Arduino sketch
 
+## Library dependencies
+
+Install these Arduino libraries before compiling:
+
+- `Control_Surface`
+- `U8g2`
+- `OneButton`
+- `HC4067`
+- `ResponsiveAnalogRead`
+- `AiEsp32RotaryEncoder`
+
 This sketch is intended to be compiled from a folder that contains **one** active
 `.ino` file: `mojmidi4.ino`.
 

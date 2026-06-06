@@ -3,10 +3,8 @@
 #include "HC4067.h"
 #include <ResponsiveAnalogRead.h>
 #include <AiEsp32RotaryEncoder.h>
-#include <U8g2lib.h>
-#ifdef U8X8_HAVE_HW_I2C
-#include <Wire.h>
-#endif
+#include <OneButton.h>
+#include "display.h"
 
 // Set to 1 to enable Serial debug output
 #define DEBUG 0
@@ -55,10 +53,8 @@ const int midiCCNumbers[4] = {1, 2, 3, 4};
 const int channelButton1 = 15;
 const int channelButton2 = 4;
 
-int channelButton1State = HIGH;
-int lastChannelButton1State = HIGH;
-int channelButton2State = HIGH;
-int lastChannelButton2State = HIGH;
+OneButton encoderButton1(channelButton1, true, true);
+OneButton encoderButton2(channelButton2, true, true);
 
 // Current MIDI channel (0-3)
 int midiChannel = 0;
@@ -75,15 +71,6 @@ AiEsp32RotaryEncoder rotaryEncoder2(ROTARY_ENCODER_A_PIN_2, ROTARY_ENCODER_B_PIN
 
 int encoder1Values[4] = {64, 64, 64, 64};
 int encoder2Values[4] = {64, 64, 64, 64};
-
-// OLED Display Setup
-#define OLED_I2C_ADDRESS 0x3C
-U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
-
-// Track what's currently shown to avoid redundant redraws
-int lastDisplayChannel = -1;
-int lastDisplayEnc1 = -1;
-int lastDisplayEnc2 = -1;
 
 // ISR for rotary encoders
 void IRAM_ATTR readEncoderISR1() {
@@ -103,33 +90,69 @@ void sendMidiMessage(MIDIMessageType type, int zeroBasedChannel, int data1, int 
   midi.sendNow();
 }
 
-void printChannelAndEncoders(int channel, int enc1Value, int enc2Value) {
-  // Only redraw if something changed
-  if (channel == lastDisplayChannel && enc1Value == lastDisplayEnc1 && enc2Value == lastDisplayEnc2) return;
-  lastDisplayChannel = channel;
-  lastDisplayEnc1 = enc1Value;
-  lastDisplayEnc2 = enc2Value;
+void switchMidiChannel(int direction) {
+  encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
+  encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
+  midiChannel = (midiChannel + direction + 4) % 4;
+  rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
+  rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
+#if DEBUG
+  Serial.print("MIDI channel -> "); Serial.println(midiChannel);
+#endif
+  printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
+}
 
-  char channelText[6];
-  char enc1Text[13];
-  char enc2Text[13];
-  snprintf(channelText, sizeof(channelText), "CH:%02d", channel);
-  snprintf(enc1Text, sizeof(enc1Text), "ENC1:%d", enc1Value);
-  snprintf(enc2Text, sizeof(enc2Text), "ENC2:%d", enc2Value);
+void handleEncoderButton1Click() {
+  switchMidiChannel(1);
+}
 
-  display.clearBuffer();
+void handleEncoderButton2Click() {
+  switchMidiChannel(-1);
+}
 
-  display.setFont(u8g2_font_5x7_tf);
-  display.drawStr(24, 7, "EUCALIPTUS MIDI");
+void handleEncoderButton1DoubleClick() {
+#if DEBUG
+  Serial.println("Encoder button 1 double click");
+#endif
+}
 
-  display.setFont(u8g2_font_10x20_tf);
-  display.drawStr(38, 23, channelText);
+void handleEncoderButton2DoubleClick() {
+#if DEBUG
+  Serial.println("Encoder button 2 double click");
+#endif
+}
 
-  display.setFont(u8g2_font_5x7_tf);
-  display.drawStr(1, 31, enc1Text);
-  display.drawStr(86, 31, enc2Text);
+void handleEncoderButton1LongPress() {
+#if DEBUG
+  Serial.println("Encoder button 1 long press");
+#endif
+}
 
-  display.sendBuffer();
+void handleEncoderButton2LongPress() {
+#if DEBUG
+  Serial.println("Encoder button 2 long press");
+#endif
+}
+
+void setupEncoderButtons() {
+  encoderButton1.setDebounceMs(50);
+  encoderButton1.setClickMs(400);
+  encoderButton1.setPressMs(800);
+  encoderButton1.attachClick(handleEncoderButton1Click);
+  encoderButton1.attachDoubleClick(handleEncoderButton1DoubleClick);
+  encoderButton1.attachLongPressStart(handleEncoderButton1LongPress);
+
+  encoderButton2.setDebounceMs(50);
+  encoderButton2.setClickMs(400);
+  encoderButton2.setPressMs(800);
+  encoderButton2.attachClick(handleEncoderButton2Click);
+  encoderButton2.attachDoubleClick(handleEncoderButton2DoubleClick);
+  encoderButton2.attachLongPressStart(handleEncoderButton2LongPress);
+}
+
+void tickEncoderButtons() {
+  encoderButton1.tick();
+  encoderButton2.tick();
 }
 
 // Read a single potentiometer sample via the mux (ResponsiveAnalogRead handles smoothing)
@@ -152,8 +175,7 @@ void setup() {
   }
 
   pinMode(muxInputPin, INPUT);
-  pinMode(channelButton1, INPUT_PULLUP);
-  pinMode(channelButton2, INPUT_PULLUP);
+  setupEncoderButtons();
 
   analogReadResolution(12);
 
@@ -178,12 +200,7 @@ void setup() {
   rotaryEncoder2.setAcceleration(100);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
 
-  display.setI2CAddress(OLED_I2C_ADDRESS * 2);
-  if (!display.begin()) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for (;;);
-  }
-  display.clearBuffer();
+  initializeDisplay();
   printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
 }
 
@@ -252,38 +269,8 @@ void loop() {
       }
     }
 
-    // --- MIDI channel switching ---
-    channelButton1State = digitalRead(channelButton1);
-    channelButton2State = digitalRead(channelButton2);
-
-    if (channelButton1State == LOW && lastChannelButton1State == HIGH) {
-      encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
-      encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
-      midiChannel = (midiChannel + 1) % 4;
-      rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
-      rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
-#if DEBUG
-      Serial.print("MIDI channel -> "); Serial.println(midiChannel);
-#endif
-      printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
-      delay(200); // debounce
-    }
-
-    if (channelButton2State == LOW && lastChannelButton2State == HIGH) {
-      encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
-      encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
-      midiChannel = (midiChannel - 1 + 4) % 4;
-      rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
-      rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
-#if DEBUG
-      Serial.print("MIDI channel -> "); Serial.println(midiChannel);
-#endif
-      printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
-      delay(200); // debounce
-    }
-
-    lastChannelButton1State = channelButton1State;
-    lastChannelButton2State = channelButton2State;
+    // --- Encoder button clicks ---
+    tickEncoderButtons();
 
     // --- Rotary encoders ---
     int encoder1Position = rotaryEncoder1.readEncoder();
