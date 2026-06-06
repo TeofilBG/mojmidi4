@@ -1,14 +1,17 @@
 #include <Arduino.h>
-#include <BLEMidi.h>
+#include <Control_Surface.h>
 #include "HC4067.h"
 #include <ResponsiveAnalogRead.h>
 #include <AiEsp32RotaryEncoder.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include <Fonts/Org_01.h>
+#include <OneButton.h>
+#include <Preferences.h>
+#include "display.h"
 
 // Set to 1 to enable Serial debug output
 #define DEBUG 0
+
+// Bluetooth MIDI interface provided by the Control Surface library
+BluetoothMIDI_Interface midi;
 
 // Define the number of direct buttons and their pins
 const int numButtons = 8;
@@ -27,8 +30,15 @@ HC4067 mp(18, 5, 17, 16); // S0, S1, S2, S3 pins
 const int muxInputPin = 0;
 uint16_t previousMuxValues = 0;
 
-// Define the MIDI notes for the multiplexer buttons
-const int muxMidiNotes[16] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
+// Define the default MIDI notes for the multiplexer buttons
+const int defaultMuxMidiNotes[16] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
+int muxMidiNotes[16] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
+
+const int minEditableMidiNote = 21;
+const int maxEditableMidiNote = 108;
+const char midiNoteStorageNamespace[] = "mojmidi";
+
+Preferences midiNotePreferences;
 
 // Potentiometer signal pin
 const int potInputPin = 2;
@@ -51,13 +61,16 @@ const int midiCCNumbers[4] = {1, 2, 3, 4};
 const int channelButton1 = 15;
 const int channelButton2 = 4;
 
-int channelButton1State = HIGH;
-int lastChannelButton1State = HIGH;
-int channelButton2State = HIGH;
-int lastChannelButton2State = HIGH;
+OneButton encoderButton1(channelButton1, true, true);
+OneButton encoderButton2(channelButton2, true, true);
 
 // Current MIDI channel (0-3)
 int midiChannel = 0;
+
+bool midiNoteEditMode = false;
+bool midiNoteMappingsSaved = false;
+int selectedMidiNote = 60;
+int editedMuxChannel = -1;
 
 // Rotary Encoder Pins and Setup
 #define ROTARY_ENCODER_A_PIN_1 26
@@ -72,17 +85,6 @@ AiEsp32RotaryEncoder rotaryEncoder2(ROTARY_ENCODER_A_PIN_2, ROTARY_ENCODER_B_PIN
 int encoder1Values[4] = {64, 64, 64, 64};
 int encoder2Values[4] = {64, 64, 64, 64};
 
-// OLED Display Setup
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 32
-#define OLED_RESET    -1
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-
-// Track what's currently shown to avoid redundant redraws
-int lastDisplayChannel = -1;
-int lastDisplayEnc1 = -1;
-int lastDisplayEnc2 = -1;
-
 // ISR for rotary encoders
 void IRAM_ATTR readEncoderISR1() {
   rotaryEncoder1.readEncoder_ISR();
@@ -92,35 +94,193 @@ void IRAM_ATTR readEncoderISR2() {
   rotaryEncoder2.readEncoder_ISR();
 }
 
-void printChannelAndEncoders(int channel, int enc1Value, int enc2Value) {
-  // Only redraw if something changed
-  if (channel == lastDisplayChannel && enc1Value == lastDisplayEnc1 && enc2Value == lastDisplayEnc2) return;
-  lastDisplayChannel = channel;
-  lastDisplayEnc1 = enc1Value;
-  lastDisplayEnc2 = enc2Value;
+Channel midiChannelFromZeroBased(int zeroBasedChannel) {
+  return Channel(static_cast<uint8_t>(zeroBasedChannel));
+}
 
-  display.clearDisplay();
+void sendMidiMessage(MIDIMessageType type, int zeroBasedChannel, int data1, int data2) {
+  midi.sendChannelMessage(type, midiChannelFromZeroBased(zeroBasedChannel), data1, data2);
+  midi.sendNow();
+}
 
-  display.setCursor(24, 0);
-  display.setTextSize(1);
-  display.print("EUCALIPTUS MIDI");
+uint16_t readMuxButtons() {
+  uint16_t currentMuxValues = 0;
+  for (int channel = 0; channel < 16; channel++) {
+    mp.setChannel(channel);
+    if (digitalRead(muxInputPin) == LOW) {
+      currentMuxValues |= (1 << channel);
+    }
+  }
+  return currentMuxValues;
+}
 
-  display.setCursor(38, 9);
-  display.setTextSize(2);
-  display.print("CH:");
-  if (channel < 9) display.print("0");
-  display.print(channel);
-  display.setTextSize(1);
+void loadMuxMidiNotes() {
+  midiNotePreferences.begin(midiNoteStorageNamespace, true);
+  for (int channel = 0; channel < 16; channel++) {
+    char key[5];
+    snprintf(key, sizeof(key), "n%02d", channel);
+    muxMidiNotes[channel] = midiNotePreferences.getUChar(key, defaultMuxMidiNotes[channel]);
+    muxMidiNotes[channel] = constrain(muxMidiNotes[channel], minEditableMidiNote, maxEditableMidiNote);
+  }
+  midiNotePreferences.end();
+}
 
-  display.setCursor(1, 25);
-  display.print("ENC1:");
-  display.print(enc1Value);
+void saveMuxMidiNotes() {
+  midiNotePreferences.begin(midiNoteStorageNamespace, false);
+  for (int channel = 0; channel < 16; channel++) {
+    char key[5];
+    snprintf(key, sizeof(key), "n%02d", channel);
+    midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrain(muxMidiNotes[channel], minEditableMidiNote, maxEditableMidiNote)));
+  }
+  midiNotePreferences.end();
+  midiNoteMappingsSaved = true;
+  printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, true);
+#if DEBUG
+  Serial.println("Mux MIDI notes saved");
+#endif
+}
 
-  display.setCursor(86, 25);
-  display.print("ENC2:");
-  display.print(enc2Value);
+void enterMidiNoteEditMode() {
+  if (midiNoteEditMode) return;
 
-  display.display();
+  encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
+  encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
+  selectedMidiNote = constrain(muxMidiNotes[0], minEditableMidiNote, maxEditableMidiNote);
+  editedMuxChannel = -1;
+  midiNoteMappingsSaved = false;
+  midiNoteEditMode = true;
+
+  previousMuxValues = readMuxButtons();
+  rotaryEncoder2.setBoundaries(minEditableMidiNote, maxEditableMidiNote, false);
+  rotaryEncoder2.setEncoderValue(selectedMidiNote);
+  printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, false);
+#if DEBUG
+  Serial.println("MIDI note edit mode entered");
+#endif
+}
+
+void exitMidiNoteEditMode() {
+  if (!midiNoteEditMode) return;
+
+  selectedMidiNote = constrain(rotaryEncoder2.readEncoder(), minEditableMidiNote, maxEditableMidiNote);
+  midiNoteEditMode = false;
+  previousMuxValues = readMuxButtons();
+  rotaryEncoder2.setBoundaries(0, 127, false);
+  rotaryEncoder2.setAcceleration(100);
+  rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
+  printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
+#if DEBUG
+  Serial.println("MIDI note edit mode exited");
+#endif
+}
+
+void toggleMidiNoteEditMode() {
+  if (midiNoteEditMode) {
+    exitMidiNoteEditMode();
+  } else {
+    enterMidiNoteEditMode();
+  }
+}
+
+void switchMidiChannel(int direction) {
+  encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
+  encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
+  midiChannel = (midiChannel + direction + 4) % 4;
+  rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
+  rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
+#if DEBUG
+  Serial.print("MIDI channel -> "); Serial.println(midiChannel);
+#endif
+  printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
+}
+
+void handleEncoderButton1Click() {
+  if (!midiNoteEditMode) {
+    switchMidiChannel(1);
+  }
+}
+
+void handleEncoderButton2Click() {
+  if (midiNoteEditMode) {
+    saveMuxMidiNotes();
+  } else {
+    switchMidiChannel(-1);
+  }
+}
+
+void handleEncoderButton1DoubleClick() {
+#if DEBUG
+  Serial.println("Encoder button 1 double click");
+#endif
+}
+
+void handleEncoderButton2DoubleClick() {
+#if DEBUG
+  Serial.println("Encoder button 2 double click");
+#endif
+}
+
+void handleEncoderButton1LongPress() {
+#if DEBUG
+  Serial.println("Encoder button 1 long press");
+#endif
+}
+
+void handleEncoderButton2LongPress() {
+  toggleMidiNoteEditMode();
+}
+
+void setupEncoderButtons() {
+  encoderButton1.setDebounceMs(50);
+  encoderButton1.setClickMs(400);
+  encoderButton1.setPressMs(800);
+  encoderButton1.attachClick(handleEncoderButton1Click);
+  encoderButton1.attachDoubleClick(handleEncoderButton1DoubleClick);
+  encoderButton1.attachLongPressStart(handleEncoderButton1LongPress);
+
+  encoderButton2.setDebounceMs(50);
+  encoderButton2.setClickMs(400);
+  encoderButton2.setPressMs(800);
+  encoderButton2.attachClick(handleEncoderButton2Click);
+  encoderButton2.attachDoubleClick(handleEncoderButton2DoubleClick);
+  encoderButton2.attachLongPressStart(handleEncoderButton2LongPress);
+}
+
+void tickEncoderButtons() {
+  encoderButton1.tick();
+  encoderButton2.tick();
+}
+
+void handleMidiNoteEditMode() {
+  int encoder2Position = rotaryEncoder2.readEncoder();
+  int constrainedPosition = constrain(encoder2Position, minEditableMidiNote, maxEditableMidiNote);
+  if (encoder2Position != constrainedPosition) {
+    rotaryEncoder2.setEncoderValue(constrainedPosition);
+  }
+
+  if (constrainedPosition != selectedMidiNote) {
+    selectedMidiNote = constrainedPosition;
+    midiNoteMappingsSaved = false;
+    printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, false);
+  }
+
+  uint16_t currentMuxValues = readMuxButtons();
+  for (int channel = 0; channel < 16; channel++) {
+    bool previousState = (previousMuxValues >> channel) & 1;
+    bool currentState  = (currentMuxValues  >> channel) & 1;
+
+    if (!previousState && currentState) {
+      muxMidiNotes[channel] = selectedMidiNote;
+      editedMuxChannel = channel;
+      midiNoteMappingsSaved = false;
+      printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, false);
+#if DEBUG
+      Serial.print("Mux Button "); Serial.print(channel);
+      Serial.print(" note set to "); Serial.println(selectedMidiNote);
+#endif
+    }
+  }
+  previousMuxValues = currentMuxValues;
 }
 
 // Read a single potentiometer sample via the mux (ResponsiveAnalogRead handles smoothing)
@@ -134,16 +294,18 @@ uint16_t readPotentiometer(int channel) {
 void setup() {
   Serial.begin(115200);
   Serial.println("Initializing Bluetooth...");
-  BLEMidiServer.begin("EUCALIPTUS MIDI RED"); ///////////////////////////////////////////////// NAME THE MIDI CONTROLLER
+  midi.setName("EUCALIPTUS MIDI RED"); ///////////////////////////////////////////////// NAME THE MIDI CONTROLLER
+  midi.begin();
   Serial.println("Waiting for connections...");
+
+  loadMuxMidiNotes();
 
   for (int i = 0; i < numButtons; i++) {
     pinMode(buttonPins[i], INPUT_PULLUP);
   }
 
   pinMode(muxInputPin, INPUT);
-  pinMode(channelButton1, INPUT_PULLUP);
-  pinMode(channelButton2, INPUT_PULLUP);
+  setupEncoderButtons();
 
   analogReadResolution(12);
 
@@ -164,59 +326,53 @@ void setup() {
 
   rotaryEncoder2.begin();
   rotaryEncoder2.setup(readEncoderISR2);
+  previousMuxValues = readMuxButtons();
   rotaryEncoder2.setBoundaries(0, 127, false);
   rotaryEncoder2.setAcceleration(100);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    Serial.println(F("SSD1306 allocation failed"));
-    for (;;);
-  }
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
+  initializeDisplay();
   printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
 }
 
 void loop() {
-  if (BLEMidiServer.isConnected()) {
+  midi.update();
+  tickEncoderButtons();
+
+  if (midiNoteEditMode) {
+    handleMidiNoteEditMode();
+  } else if (midi.isConnected()) {
     // --- Direct buttons ---
     for (int i = 0; i < numButtons; i++) {
       buttonStates[i] = digitalRead(buttonPins[i]);
       if (buttonStates[i] != lastButtonStates[i]) {
         if (buttonStates[i] == LOW) {
-          BLEMidiServer.noteOn(0, midiNotes[i], 127);
+          sendMidiMessage(MIDIMessageType::NoteOn, 0, midiNotes[i], 127);
 #if DEBUG
           Serial.print("Direct Button "); Serial.print(i); Serial.println(" pressed");
 #endif
         } else {
-          BLEMidiServer.noteOff(0, midiNotes[i], 127);
+          sendMidiMessage(MIDIMessageType::NoteOff, 0, midiNotes[i], 127);
         }
         lastButtonStates[i] = buttonStates[i];
       }
     }
 
     // --- Multiplexer buttons ---
-    // Fix: set bit at position 'channel' so channel N maps to bit N
-    uint16_t currentMuxValues = 0;
-    for (int channel = 0; channel < 16; channel++) {
-      mp.setChannel(channel);
-      if (digitalRead(muxInputPin) == LOW) {
-        currentMuxValues |= (1 << channel);
-      }
-    }
+    uint16_t currentMuxValues = readMuxButtons();
 
     for (int channel = 0; channel < 16; channel++) {
       bool previousState = (previousMuxValues >> channel) & 1;
       bool currentState  = (currentMuxValues  >> channel) & 1;
 
       if (!previousState && currentState) {
-        BLEMidiServer.noteOn(midiChannel, muxMidiNotes[channel], 127);
+        sendMidiMessage(MIDIMessageType::NoteOn, midiChannel, muxMidiNotes[channel], 127);
 #if DEBUG
         Serial.print("Mux Button "); Serial.print(channel);
         Serial.print(" pressed on MIDI channel "); Serial.println(midiChannel);
 #endif
       } else if (previousState && !currentState) {
-        BLEMidiServer.noteOff(midiChannel, muxMidiNotes[channel], 127);
+        sendMidiMessage(MIDIMessageType::NoteOff, midiChannel, muxMidiNotes[channel], 127);
       }
     }
     previousMuxValues = currentMuxValues;
@@ -229,7 +385,7 @@ void loop() {
       // Compare on mapped 0-127 value to avoid sub-step jitter
       int midiCCValue = map(rawValue, 0, 4095, 127, 0);
       if (midiCCValue != previousMidiCCValues[channel]) {
-        BLEMidiServer.controlChange(midiChannel, midiCCNumbers[channel], midiCCValue);
+        sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, midiCCNumbers[channel], midiCCValue);
         previousMidiCCValues[channel] = midiCCValue;
 #if DEBUG
         Serial.print("Pot "); Serial.print(channel);
@@ -240,45 +396,12 @@ void loop() {
       }
     }
 
-    // --- MIDI channel switching ---
-    channelButton1State = digitalRead(channelButton1);
-    channelButton2State = digitalRead(channelButton2);
-
-    if (channelButton1State == LOW && lastChannelButton1State == HIGH) {
-      encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
-      encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
-      midiChannel = (midiChannel + 1) % 4;
-      rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
-      rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
-#if DEBUG
-      Serial.print("MIDI channel -> "); Serial.println(midiChannel);
-#endif
-      printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
-      delay(200); // debounce
-    }
-
-    if (channelButton2State == LOW && lastChannelButton2State == HIGH) {
-      encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
-      encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
-      midiChannel = (midiChannel - 1 + 4) % 4;
-      rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
-      rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
-#if DEBUG
-      Serial.print("MIDI channel -> "); Serial.println(midiChannel);
-#endif
-      printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
-      delay(200); // debounce
-    }
-
-    lastChannelButton1State = channelButton1State;
-    lastChannelButton2State = channelButton2State;
-
     // --- Rotary encoders ---
     int encoder1Position = rotaryEncoder1.readEncoder();
     int encoder2Position = rotaryEncoder2.readEncoder();
 
     if (encoder1Position != encoder1Values[midiChannel]) {
-      BLEMidiServer.controlChange(midiChannel, 10, encoder1Position);
+      sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, 10, encoder1Position);
       encoder1Values[midiChannel] = encoder1Position;
 #if DEBUG
       Serial.print("Enc1: "); Serial.print(encoder1Position);
@@ -288,7 +411,7 @@ void loop() {
     }
 
     if (encoder2Position != encoder2Values[midiChannel]) {
-      BLEMidiServer.controlChange(midiChannel, 11, encoder2Position);
+      sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, 11, encoder2Position);
       encoder2Values[midiChannel] = encoder2Position;
 #if DEBUG
       Serial.print("Enc2: "); Serial.print(encoder2Position);
