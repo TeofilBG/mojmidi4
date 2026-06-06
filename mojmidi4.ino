@@ -3,7 +3,10 @@
 #include "HC4067.h"
 #include <ResponsiveAnalogRead.h>
 #include <AiEsp32RotaryEncoder.h>
-#include "display.h"
+#include <U8g2lib.h>
+#ifdef U8X8_HAVE_HW_I2C
+#include <Wire.h>
+#endif
 
 // Set to 1 to enable Serial debug output
 #define DEBUG 0
@@ -73,6 +76,15 @@ AiEsp32RotaryEncoder rotaryEncoder2(ROTARY_ENCODER_A_PIN_2, ROTARY_ENCODER_B_PIN
 int encoder1Values[4] = {64, 64, 64, 64};
 int encoder2Values[4] = {64, 64, 64, 64};
 
+// OLED Display Setup
+#define OLED_I2C_ADDRESS 0x3C
+U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
+
+// Track what's currently shown to avoid redundant redraws
+int lastDisplayChannel = -1;
+int lastDisplayEnc1 = -1;
+int lastDisplayEnc2 = -1;
+
 // ISR for rotary encoders
 void IRAM_ATTR readEncoderISR1() {
   rotaryEncoder1.readEncoder_ISR();
@@ -89,6 +101,35 @@ Channel midiChannelFromZeroBased(int zeroBasedChannel) {
 void sendMidiMessage(MIDIMessageType type, int zeroBasedChannel, int data1, int data2) {
   midi.sendChannelMessage(type, midiChannelFromZeroBased(zeroBasedChannel), data1, data2);
   midi.sendNow();
+}
+
+void printChannelAndEncoders(int channel, int enc1Value, int enc2Value) {
+  // Only redraw if something changed
+  if (channel == lastDisplayChannel && enc1Value == lastDisplayEnc1 && enc2Value == lastDisplayEnc2) return;
+  lastDisplayChannel = channel;
+  lastDisplayEnc1 = enc1Value;
+  lastDisplayEnc2 = enc2Value;
+
+  char channelText[6];
+  char enc1Text[13];
+  char enc2Text[13];
+  snprintf(channelText, sizeof(channelText), "CH:%02d", channel);
+  snprintf(enc1Text, sizeof(enc1Text), "ENC1:%d", enc1Value);
+  snprintf(enc2Text, sizeof(enc2Text), "ENC2:%d", enc2Value);
+
+  display.clearBuffer();
+
+  display.setFont(u8g2_font_5x7_tf);
+  display.drawStr(24, 7, "EUCALIPTUS MIDI");
+
+  display.setFont(u8g2_font_10x20_tf);
+  display.drawStr(38, 23, channelText);
+
+  display.setFont(u8g2_font_5x7_tf);
+  display.drawStr(1, 31, enc1Text);
+  display.drawStr(86, 31, enc2Text);
+
+  display.sendBuffer();
 }
 
 // Read a single potentiometer sample via the mux (ResponsiveAnalogRead handles smoothing)
@@ -137,7 +178,12 @@ void setup() {
   rotaryEncoder2.setAcceleration(100);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
 
-  initializeDisplay();
+  display.setI2CAddress(OLED_I2C_ADDRESS * 2);
+  if (!display.begin()) {
+    Serial.println(F("SSD1306 allocation failed"));
+    for (;;);
+  }
+  display.clearBuffer();
   printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
 }
 
