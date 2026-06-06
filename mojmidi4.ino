@@ -71,6 +71,8 @@ bool midiNoteEditMode = false;
 bool midiNoteMappingsSaved = false;
 int selectedMidiNote = 60;
 int editedMuxChannel = -1;
+int lastEditEncoder1Position = 0;
+int lastEditEncoder2Position = 0;
 
 // Rotary Encoder Pins and Setup
 #define ROTARY_ENCODER_A_PIN_1 26
@@ -151,8 +153,8 @@ void enterMidiNoteEditMode() {
   midiNoteEditMode = true;
 
   previousMuxValues = readMuxButtons();
-  rotaryEncoder2.setBoundaries(minEditableMidiNote, maxEditableMidiNote, false);
-  rotaryEncoder2.setEncoderValue(selectedMidiNote);
+  lastEditEncoder1Position = rotaryEncoder1.readEncoder();
+  lastEditEncoder2Position = rotaryEncoder2.readEncoder();
   printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, false);
 #if DEBUG
   Serial.println("MIDI note edit mode entered");
@@ -162,11 +164,10 @@ void enterMidiNoteEditMode() {
 void exitMidiNoteEditMode() {
   if (!midiNoteEditMode) return;
 
-  selectedMidiNote = constrain(rotaryEncoder2.readEncoder(), minEditableMidiNote, maxEditableMidiNote);
+  selectedMidiNote = constrain(selectedMidiNote, minEditableMidiNote, maxEditableMidiNote);
   midiNoteEditMode = false;
   previousMuxValues = readMuxButtons();
-  rotaryEncoder2.setBoundaries(0, 127, false);
-  rotaryEncoder2.setAcceleration(100);
+  rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
   printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
 #if DEBUG
@@ -252,14 +253,14 @@ void tickEncoderButtons() {
 }
 
 void handleMidiNoteEditMode() {
+  int encoder1Position = rotaryEncoder1.readEncoder();
   int encoder2Position = rotaryEncoder2.readEncoder();
-  int constrainedPosition = constrain(encoder2Position, minEditableMidiNote, maxEditableMidiNote);
-  if (encoder2Position != constrainedPosition) {
-    rotaryEncoder2.setEncoderValue(constrainedPosition);
-  }
+  int encoderDelta = (encoder1Position - lastEditEncoder1Position) + (encoder2Position - lastEditEncoder2Position);
+  lastEditEncoder1Position = encoder1Position;
+  lastEditEncoder2Position = encoder2Position;
 
-  if (constrainedPosition != selectedMidiNote) {
-    selectedMidiNote = constrainedPosition;
+  if (encoderDelta != 0) {
+    selectedMidiNote = constrain(selectedMidiNote + encoderDelta, minEditableMidiNote, maxEditableMidiNote);
     midiNoteMappingsSaved = false;
     printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, false);
   }
@@ -330,6 +331,7 @@ void setup() {
   rotaryEncoder2.setBoundaries(0, 127, false);
   rotaryEncoder2.setAcceleration(100);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
+  previousMuxValues = readMuxButtons();
 
   initializeDisplay();
   printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
