@@ -1,14 +1,18 @@
 #include <Arduino.h>
-#include <BLEMidi.h>
+#include <Control_Surface.h>
 #include "HC4067.h"
 #include <ResponsiveAnalogRead.h>
 #include <AiEsp32RotaryEncoder.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
-#include <Fonts/Org_01.h>
+#include <U8g2lib.h>
+#ifdef U8X8_HAVE_HW_I2C
+#include <Wire.h>
+#endif
 
 // Set to 1 to enable Serial debug output
 #define DEBUG 0
+
+// Bluetooth MIDI interface provided by the Control Surface library
+BluetoothMIDI_Interface midi;
 
 // Define the number of direct buttons and their pins
 const int numButtons = 8;
@@ -73,10 +77,8 @@ int encoder1Values[4] = {64, 64, 64, 64};
 int encoder2Values[4] = {64, 64, 64, 64};
 
 // OLED Display Setup
-#define SCREEN_WIDTH 128
-#define SCREEN_HEIGHT 32
-#define OLED_RESET    -1
-Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+#define OLED_I2C_ADDRESS 0x3C
+U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
 
 // Track what's currently shown to avoid redundant redraws
 int lastDisplayChannel = -1;
@@ -92,6 +94,15 @@ void IRAM_ATTR readEncoderISR2() {
   rotaryEncoder2.readEncoder_ISR();
 }
 
+Channel midiChannelFromZeroBased(int zeroBasedChannel) {
+  return Channel(static_cast<uint8_t>(zeroBasedChannel));
+}
+
+void sendMidiMessage(MIDIMessageType type, int zeroBasedChannel, int data1, int data2) {
+  midi.sendChannelMessage(type, midiChannelFromZeroBased(zeroBasedChannel), data1, data2);
+  midi.sendNow();
+}
+
 void printChannelAndEncoders(int channel, int enc1Value, int enc2Value) {
   // Only redraw if something changed
   if (channel == lastDisplayChannel && enc1Value == lastDisplayEnc1 && enc2Value == lastDisplayEnc2) return;
@@ -99,28 +110,26 @@ void printChannelAndEncoders(int channel, int enc1Value, int enc2Value) {
   lastDisplayEnc1 = enc1Value;
   lastDisplayEnc2 = enc2Value;
 
-  display.clearDisplay();
+  char channelText[6];
+  char enc1Text[13];
+  char enc2Text[13];
+  snprintf(channelText, sizeof(channelText), "CH:%02d", channel);
+  snprintf(enc1Text, sizeof(enc1Text), "ENC1:%d", enc1Value);
+  snprintf(enc2Text, sizeof(enc2Text), "ENC2:%d", enc2Value);
 
-  display.setCursor(24, 0);
-  display.setTextSize(1);
-  display.print("EUCALIPTUS MIDI");
+  display.clearBuffer();
 
-  display.setCursor(38, 9);
-  display.setTextSize(2);
-  display.print("CH:");
-  if (channel < 9) display.print("0");
-  display.print(channel);
-  display.setTextSize(1);
+  display.setFont(u8g2_font_5x7_tf);
+  display.drawStr(24, 7, "EUCALIPTUS MIDI");
 
-  display.setCursor(1, 25);
-  display.print("ENC1:");
-  display.print(enc1Value);
+  display.setFont(u8g2_font_10x20_tf);
+  display.drawStr(38, 23, channelText);
 
-  display.setCursor(86, 25);
-  display.print("ENC2:");
-  display.print(enc2Value);
+  display.setFont(u8g2_font_5x7_tf);
+  display.drawStr(1, 31, enc1Text);
+  display.drawStr(86, 31, enc2Text);
 
-  display.display();
+  display.sendBuffer();
 }
 
 // Read a single potentiometer sample via the mux (ResponsiveAnalogRead handles smoothing)
@@ -134,7 +143,8 @@ uint16_t readPotentiometer(int channel) {
 void setup() {
   Serial.begin(115200);
   Serial.println("Initializing Bluetooth...");
-  BLEMidiServer.begin("EUCALIPTUS MIDI RED"); ///////////////////////////////////////////////// NAME THE MIDI CONTROLLER
+  midi.setName("EUCALIPTUS MIDI RED"); ///////////////////////////////////////////////// NAME THE MIDI CONTROLLER
+  midi.begin();
   Serial.println("Waiting for connections...");
 
   for (int i = 0; i < numButtons; i++) {
@@ -168,28 +178,30 @@ void setup() {
   rotaryEncoder2.setAcceleration(100);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+  display.setI2CAddress(OLED_I2C_ADDRESS * 2);
+  if (!display.begin()) {
     Serial.println(F("SSD1306 allocation failed"));
     for (;;);
   }
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
+  display.clearBuffer();
   printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
 }
 
 void loop() {
-  if (BLEMidiServer.isConnected()) {
+  midi.update();
+
+  if (midi.isConnected()) {
     // --- Direct buttons ---
     for (int i = 0; i < numButtons; i++) {
       buttonStates[i] = digitalRead(buttonPins[i]);
       if (buttonStates[i] != lastButtonStates[i]) {
         if (buttonStates[i] == LOW) {
-          BLEMidiServer.noteOn(0, midiNotes[i], 127);
+          sendMidiMessage(MIDIMessageType::NoteOn, 0, midiNotes[i], 127);
 #if DEBUG
           Serial.print("Direct Button "); Serial.print(i); Serial.println(" pressed");
 #endif
         } else {
-          BLEMidiServer.noteOff(0, midiNotes[i], 127);
+          sendMidiMessage(MIDIMessageType::NoteOff, 0, midiNotes[i], 127);
         }
         lastButtonStates[i] = buttonStates[i];
       }
@@ -210,13 +222,13 @@ void loop() {
       bool currentState  = (currentMuxValues  >> channel) & 1;
 
       if (!previousState && currentState) {
-        BLEMidiServer.noteOn(midiChannel, muxMidiNotes[channel], 127);
+        sendMidiMessage(MIDIMessageType::NoteOn, midiChannel, muxMidiNotes[channel], 127);
 #if DEBUG
         Serial.print("Mux Button "); Serial.print(channel);
         Serial.print(" pressed on MIDI channel "); Serial.println(midiChannel);
 #endif
       } else if (previousState && !currentState) {
-        BLEMidiServer.noteOff(midiChannel, muxMidiNotes[channel], 127);
+        sendMidiMessage(MIDIMessageType::NoteOff, midiChannel, muxMidiNotes[channel], 127);
       }
     }
     previousMuxValues = currentMuxValues;
@@ -229,7 +241,7 @@ void loop() {
       // Compare on mapped 0-127 value to avoid sub-step jitter
       int midiCCValue = map(rawValue, 0, 4095, 127, 0);
       if (midiCCValue != previousMidiCCValues[channel]) {
-        BLEMidiServer.controlChange(midiChannel, midiCCNumbers[channel], midiCCValue);
+        sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, midiCCNumbers[channel], midiCCValue);
         previousMidiCCValues[channel] = midiCCValue;
 #if DEBUG
         Serial.print("Pot "); Serial.print(channel);
@@ -278,7 +290,7 @@ void loop() {
     int encoder2Position = rotaryEncoder2.readEncoder();
 
     if (encoder1Position != encoder1Values[midiChannel]) {
-      BLEMidiServer.controlChange(midiChannel, 10, encoder1Position);
+      sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, 10, encoder1Position);
       encoder1Values[midiChannel] = encoder1Position;
 #if DEBUG
       Serial.print("Enc1: "); Serial.print(encoder1Position);
@@ -288,7 +300,7 @@ void loop() {
     }
 
     if (encoder2Position != encoder2Values[midiChannel]) {
-      BLEMidiServer.controlChange(midiChannel, 11, encoder2Position);
+      sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, 11, encoder2Position);
       encoder2Values[midiChannel] = encoder2Position;
 #if DEBUG
       Serial.print("Enc2: "); Serial.print(encoder2Position);
