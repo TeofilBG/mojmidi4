@@ -384,6 +384,7 @@ void setup() {
 
   rotaryEncoder2.begin();
   rotaryEncoder2.setup(readEncoderISR2);
+  previousMuxValues = readMuxButtons();
   rotaryEncoder2.setBoundaries(0, 127, false);
   rotaryEncoder2.setAcceleration(100);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
