@@ -13,14 +13,7 @@
 // Bluetooth MIDI interface provided by the Control Surface library
 BluetoothMIDI_Interface midi;
 
-// Bluetooth MIDI interface provided by the Control Surface library
-BluetoothMIDI_Interface midi;
 
-// Bluetooth MIDI interface provided by the Control Surface library
-BluetoothMIDI_Interface midi;
-
-// Bluetooth MIDI interface provided by the Control Surface library
-BluetoothMIDI_Interface midi;
 
 // Define the number of direct buttons and their pins
 const int numButtons = 8;
