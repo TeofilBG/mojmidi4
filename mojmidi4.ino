@@ -30,9 +30,20 @@ HC4067 mp(18, 5, 17, 16); // S0, S1, S2, S3 pins
 const int muxInputPin = 0;
 uint16_t previousMuxValues = 0;
 
-// Define the default MIDI notes for the multiplexer buttons
+enum MuxMessageType {
+  MUX_MESSAGE_NOTE = 0,
+  MUX_MESSAGE_CONTROL_CHANGE = 1,
+  MUX_MESSAGE_PROGRAM_CHANGE = 2,
+  NUM_MUX_MESSAGE_TYPES = 3
+};
+
+// Define the default MIDI values for the multiplexer buttons
 const int defaultMuxMidiNotes[16] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
 int muxMidiNotes[16] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
+int muxMessageTypes[16] = {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+                          MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+                          MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+                          MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE};
 
 const int minEditableMidiNote = 21;
 const int maxEditableMidiNote = 108;
@@ -70,6 +81,7 @@ int midiChannel = 0;
 bool midiNoteEditMode = false;
 bool midiNoteMappingsSaved = false;
 int selectedMidiNote = 60;
+int selectedMessageType = MUX_MESSAGE_NOTE;
 int editedMuxChannel = -1;
 int lastEditEncoder1Position = 0;
 int lastEditEncoder2Position = 0;
@@ -105,6 +117,27 @@ void sendMidiMessage(MIDIMessageType type, int zeroBasedChannel, int data1, int 
   midi.sendNow();
 }
 
+const char *muxMessageTypeLabel(int messageType) {
+  switch (messageType) {
+    case MUX_MESSAGE_CONTROL_CHANGE:
+      return "CC";
+    case MUX_MESSAGE_PROGRAM_CHANGE:
+      return "PC";
+    case MUX_MESSAGE_NOTE:
+    default:
+      return "NOTE";
+  }
+}
+
+int wrapMuxMessageType(int messageType) {
+  while (messageType < 0) messageType += NUM_MUX_MESSAGE_TYPES;
+  return messageType % NUM_MUX_MESSAGE_TYPES;
+}
+
+void printCurrentMidiEditScreen(bool saved) {
+  printMidiNoteEditScreen(selectedMidiNote, muxMessageTypeLabel(selectedMessageType), editedMuxChannel, saved);
+}
+
 uint16_t readMuxButtons() {
   uint16_t currentMuxValues = 0;
   for (int channel = 0; channel < 16; channel++) {
@@ -123,27 +156,32 @@ void loadMuxMidiNotes() {
     snprintf(key, sizeof(key), "n%02d", channel);
     muxMidiNotes[channel] = midiNotePreferences.getUChar(key, defaultMuxMidiNotes[channel]);
     muxMidiNotes[channel] = constrain(muxMidiNotes[channel], minEditableMidiNote, maxEditableMidiNote);
+    snprintf(key, sizeof(key), "t%02d", channel);
+    muxMessageTypes[channel] = wrapMuxMessageType(midiNotePreferences.getUChar(key, MUX_MESSAGE_NOTE));
   }
   midiNotePreferences.end();
 }
 
 void saveMuxMidiNotes() {
   if (editedMuxChannel < 0) {
-    printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, false);
+    printCurrentMidiEditScreen(false);
     return;
   }
 
   muxMidiNotes[editedMuxChannel] = constrain(selectedMidiNote, minEditableMidiNote, maxEditableMidiNote);
+  muxMessageTypes[editedMuxChannel] = wrapMuxMessageType(selectedMessageType);
 
   midiNotePreferences.begin(midiNoteStorageNamespace, false);
   for (int channel = 0; channel < 16; channel++) {
     char key[5];
     snprintf(key, sizeof(key), "n%02d", channel);
     midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrain(muxMidiNotes[channel], minEditableMidiNote, maxEditableMidiNote)));
+    snprintf(key, sizeof(key), "t%02d", channel);
+    midiNotePreferences.putUChar(key, static_cast<uint8_t>(wrapMuxMessageType(muxMessageTypes[channel])));
   }
   midiNotePreferences.end();
   midiNoteMappingsSaved = true;
-  printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, true);
+  printCurrentMidiEditScreen(true);
 #if DEBUG
   Serial.println("Mux MIDI notes saved");
 #endif
@@ -155,6 +193,7 @@ void enterMidiNoteEditMode() {
   encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
   encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
   selectedMidiNote = constrain(muxMidiNotes[0], minEditableMidiNote, maxEditableMidiNote);
+  selectedMessageType = wrapMuxMessageType(muxMessageTypes[0]);
   editedMuxChannel = -1;
   midiNoteMappingsSaved = false;
   midiNoteEditMode = true;
@@ -162,7 +201,7 @@ void enterMidiNoteEditMode() {
   previousMuxValues = readMuxButtons();
   lastEditEncoder1Position = rotaryEncoder1.readEncoder();
   lastEditEncoder2Position = rotaryEncoder2.readEncoder();
-  printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, false);
+  printCurrentMidiEditScreen(false);
 #if DEBUG
   Serial.println("MIDI note edit mode entered");
 #endif
@@ -262,14 +301,21 @@ void tickEncoderButtons() {
 void handleMidiNoteEditMode() {
   int encoder1Position = rotaryEncoder1.readEncoder();
   int encoder2Position = rotaryEncoder2.readEncoder();
-  int encoderDelta = (encoder1Position - lastEditEncoder1Position) + (encoder2Position - lastEditEncoder2Position);
+  int typeDelta = encoder1Position - lastEditEncoder1Position;
+  int valueDelta = encoder2Position - lastEditEncoder2Position;
   lastEditEncoder1Position = encoder1Position;
   lastEditEncoder2Position = encoder2Position;
 
-  if (encoderDelta != 0) {
-    selectedMidiNote = constrain(selectedMidiNote + encoderDelta, minEditableMidiNote, maxEditableMidiNote);
+  if (typeDelta != 0) {
+    selectedMessageType = wrapMuxMessageType(selectedMessageType + typeDelta);
     midiNoteMappingsSaved = false;
-    printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, false);
+    printCurrentMidiEditScreen(false);
+  }
+
+  if (valueDelta != 0) {
+    selectedMidiNote = constrain(selectedMidiNote + valueDelta, minEditableMidiNote, maxEditableMidiNote);
+    midiNoteMappingsSaved = false;
+    printCurrentMidiEditScreen(false);
   }
 
   uint16_t currentMuxValues = readMuxButtons();
@@ -280,13 +326,15 @@ void handleMidiNoteEditMode() {
     if (!previousState && currentState) {
       editedMuxChannel = channel;
       selectedMidiNote = constrain(muxMidiNotes[channel], minEditableMidiNote, maxEditableMidiNote);
+      selectedMessageType = wrapMuxMessageType(muxMessageTypes[channel]);
       lastEditEncoder1Position = rotaryEncoder1.readEncoder();
       lastEditEncoder2Position = rotaryEncoder2.readEncoder();
       midiNoteMappingsSaved = false;
-      printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, false);
+      printCurrentMidiEditScreen(false);
 #if DEBUG
       Serial.print("Mux Button "); Serial.print(channel);
-      Serial.print(" current note "); Serial.println(selectedMidiNote);
+      Serial.print(" current value "); Serial.print(selectedMidiNote);
+      Serial.print(" type "); Serial.println(muxMessageTypeLabel(selectedMessageType));
 #endif
     }
   }
@@ -376,14 +424,27 @@ void loop() {
       bool previousState = (previousMuxValues >> channel) & 1;
       bool currentState  = (currentMuxValues  >> channel) & 1;
 
+      int muxValue = constrain(muxMidiNotes[channel], minEditableMidiNote, maxEditableMidiNote);
+      int muxType = wrapMuxMessageType(muxMessageTypes[channel]);
+
       if (!previousState && currentState) {
-        sendMidiMessage(MIDIMessageType::NoteOn, midiChannel, muxMidiNotes[channel], 127);
+        if (muxType == MUX_MESSAGE_NOTE) {
+          sendMidiMessage(MIDIMessageType::NoteOn, midiChannel, muxValue, 127);
+        } else if (muxType == MUX_MESSAGE_CONTROL_CHANGE) {
+          sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, muxValue, 127);
+        } else if (muxType == MUX_MESSAGE_PROGRAM_CHANGE) {
+          sendMidiMessage(MIDIMessageType::ProgramChange, midiChannel, muxValue, 0);
+        }
 #if DEBUG
         Serial.print("Mux Button "); Serial.print(channel);
         Serial.print(" pressed on MIDI channel "); Serial.println(midiChannel);
 #endif
       } else if (previousState && !currentState) {
-        sendMidiMessage(MIDIMessageType::NoteOff, midiChannel, muxMidiNotes[channel], 127);
+        if (muxType == MUX_MESSAGE_NOTE) {
+          sendMidiMessage(MIDIMessageType::NoteOff, midiChannel, muxValue, 127);
+        } else if (muxType == MUX_MESSAGE_CONTROL_CHANGE) {
+          sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, muxValue, 0);
+        }
       }
     }
     previousMuxValues = currentMuxValues;

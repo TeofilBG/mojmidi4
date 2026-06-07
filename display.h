@@ -41,7 +41,7 @@ inline void printChannelAndEncoders(int channel, int enc1Value, int enc2Value) {
   Graphics::drawStatusScreen(display, channelText, enc1Text, enc2Text);
 }
 
-inline void printMidiNoteEditScreen(int noteValue, int muxChannel, bool saved) {
+inline void printMidiNoteEditScreen(int noteValue, const char *messageTypeText, int muxChannel, bool saved) {
   lastDisplayChannel = -1;
   lastDisplayEnc1 = -1;
   lastDisplayEnc2 = -1;
@@ -58,7 +58,7 @@ inline void printMidiNoteEditScreen(int noteValue, int muxChannel, bool saved) {
     snprintf(statusText, sizeof(statusText), "Select pad");
   }
 
-  Graphics::drawMidiNoteEditScreen(display, noteText, statusText);
+  Graphics::drawMidiNoteEditScreen(display, noteText, messageTypeText, statusText);
 }
 
 #endif
