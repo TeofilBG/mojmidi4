@@ -41,7 +41,7 @@ namespace Graphics {
     oled.clearBuffer();
 
     oled.setFont(u8g2_font_6x12_tf);
-    oled.drawStr(EDIT_LABEL_X, EDIT_LABEL_Y, "MIDI note");
+    oled.drawStr(EDIT_LABEL_X, EDIT_LABEL_Y, "MIDI val");
 
     oled.setFont(u8g2_font_10x20_tf);
     oled.drawStr(EDIT_NOTE_X, EDIT_NOTE_Y, noteText);

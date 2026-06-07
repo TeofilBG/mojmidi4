@@ -16,9 +16,11 @@ Install these Arduino libraries before compiling:
 
 Long-press encoder button 2 to enter or exit MIDI note edit mode. In this mode,
 press one of the 16 mux buttons to load that pad's current settings, turn
-encoder 1 to choose the message type (`NOTE`, `CC`, or `PC`), turn encoder 2 to
-choose the MIDI value from 21 to 108, and single-press encoder button 2 to save
-the selected type and value for that pad to ESP32 non-volatile memory.
+encoder 1 to choose the pad message type (`NOTE`, `CC`, or `PC`), turn encoder 2
+to choose the MIDI value, and single-press encoder button 2 to save the selected
+type and value. Moving a potentiometer selects that pot instead; pots stay as
+`CC`, and encoder 2 edits the pot's CC number before saving to ESP32
+non-volatile memory.
 
 This sketch is intended to be compiled from a folder that contains **one** active
 `.ino` file: `mojmidi4.ino`.
