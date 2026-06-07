@@ -19,6 +19,9 @@ BluetoothMIDI_Interface midi;
 // Bluetooth MIDI interface provided by the Control Surface library
 BluetoothMIDI_Interface midi;
 
+// Bluetooth MIDI interface provided by the Control Surface library
+BluetoothMIDI_Interface midi;
+
 // Define the number of direct buttons and their pins
 const int numButtons = 8;
 const int buttonPins[numButtons] = {12, 13, 19, 23, 32, 33, 34, 35};
@@ -214,6 +217,17 @@ int constrainSelectedValue(int value) {
   return constrain(value, selectedValueMinimum(), selectedValueMaximum());
 }
 
+int currentMidiBank() {
+  return constrain(midiChannel, 0, numMidiBanks - 1);
+}
+
+int currentEncoderCCNumber(int encoderChannel) {
+  int safeEncoderChannel = constrain(encoderChannel, 0, 1);
+  return constrain(encoderCCNumbers[currentMidiBank()][safeEncoderChannel],
+                   minEditableMidiController,
+                   maxEditableMidiController);
+}
+
 const char *currentEditTypeLabel() {
   if (selectedEditTarget == EDIT_TARGET_POT || selectedEditTarget == EDIT_TARGET_ENCODER) return "CC";
   return muxMessageTypeLabel(selectedMessageType);
@@ -377,7 +391,7 @@ void selectEncoderForEdit(int encoderChannel) {
   editedMuxChannel = -1;
   editedPotChannel = -1;
   selectedMessageType = MUX_MESSAGE_CONTROL_CHANGE;
-  selectedMidiNote = constrain(encoderCCNumbers[encoderChannel], minEditableMidiController, maxEditableMidiController);
+  selectedMidiNote = currentEncoderCCNumber(encoderChannel);
   lastEditEncoder1Position = rotaryEncoder1.readEncoder();
   lastEditEncoder2Position = rotaryEncoder2.readEncoder();
   midiNoteMappingsSaved = false;
