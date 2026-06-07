@@ -17,9 +17,11 @@ Install these Arduino libraries before compiling:
 Long-press encoder button 2 to enter or exit MIDI note edit mode. In this mode,
 press one of the 16 mux buttons to load that pad's current settings, turn
 encoder 1 to choose the pad message type (`NOTE`, `CC`, or `PC`), and turn
-encoder 2 to choose the MIDI value. Moving a potentiometer selects that pot
-instead; pots stay as `CC`, and encoder 2 edits the pot's CC number.
-Single-click an encoder button to select that encoder's CC number for editing,
+00encoder 2 to choose the MIDI value. When the selected pad type is `CC`, turn
+potentiometer 1 to choose the CC press value/velocity that will be saved with
+that pad. Moving any other potentiometer selects that pot instead; pots stay as
+`CC`, and encoder 2 edits the pot's CC number. Single-click an encoder button
+to select that encoder's CC number for editing,
 and double-click encoder button 2 to save the selected target for the current
 controller channel/bank to ESP32 non-volatile memory. Repeat the same workflow on
 channels 1, 2, 3, and 4 to store different pad, pot, and encoder mappings per
