@@ -20,8 +20,10 @@ encoder 1 to choose the pad message type (`NOTE`, `CC`, or `PC`), and turn
 encoder 2 to choose the MIDI value. Moving a potentiometer selects that pot
 instead; pots stay as `CC`, and encoder 2 edits the pot's CC number.
 Single-click an encoder button to select that encoder's CC number for editing,
-and double-click encoder button 2 to save the selected target to ESP32
-non-volatile memory.
+and double-click encoder button 2 to save the selected target for the current
+controller channel/bank to ESP32 non-volatile memory. Repeat the same workflow on
+channels 1, 2, 3, and 4 to store different pad, pot, and encoder mappings per
+channel.
 
 This sketch is intended to be compiled from a folder that contains **one** active
 `.ino` file: `mojmidi4.ino`.

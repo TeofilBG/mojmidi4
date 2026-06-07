@@ -16,6 +16,9 @@ BluetoothMIDI_Interface midi;
 // Bluetooth MIDI interface provided by the Control Surface library
 BluetoothMIDI_Interface midi;
 
+// Bluetooth MIDI interface provided by the Control Surface library
+BluetoothMIDI_Interface midi;
+
 // Define the number of direct buttons and their pins
 const int numButtons = 8;
 const int buttonPins[numButtons] = {12, 13, 19, 23, 32, 33, 34, 35};
@@ -47,13 +50,34 @@ enum EditTargetType {
   EDIT_TARGET_ENCODER = 3
 };
 
+const int numMidiBanks = 4;
+
 // Define the default MIDI values for the multiplexer buttons
 const int defaultMuxMidiNotes[16] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
-int muxMidiNotes[16] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
-int muxMessageTypes[16] = {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-                          MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-                          MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-                          MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE};
+int muxMidiNotes[numMidiBanks][16] = {
+  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
+  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
+  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
+  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63}
+};
+int muxMessageTypes[numMidiBanks][16] = {
+  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE},
+  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE},
+  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE},
+  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE}
+};
 
 const int minEditableMidiNote = 21;
 const int maxEditableMidiNote = 108;
@@ -77,7 +101,12 @@ int previousMidiCCValues[4] = {-1, -1, -1, -1};
 
 // Define default MIDI CC numbers for each potentiometer
 const int defaultMidiCCNumbers[4] = {1, 2, 3, 4};
-int midiCCNumbers[4] = {1, 2, 3, 4};
+int midiCCNumbers[numMidiBanks][4] = {
+  {1, 2, 3, 4},
+  {1, 2, 3, 4},
+  {1, 2, 3, 4},
+  {1, 2, 3, 4}
+};
 
 const int minEditableMidiController = 0;
 const int maxEditableMidiController = 127;
@@ -85,7 +114,12 @@ const int potSelectThreshold = 64;
 int lastEditPotValues[4] = {0, 0, 0, 0};
 
 const int defaultEncoderCCNumbers[2] = {10, 11};
-int encoderCCNumbers[2] = {10, 11};
+int encoderCCNumbers[numMidiBanks][2] = {
+  {10, 11},
+  {10, 11},
+  {10, 11},
+  {10, 11}
+};
 
 // Define independent buttons for MIDI channel switching
 const int channelButton1 = 15;
@@ -210,27 +244,31 @@ uint16_t readMuxButtons() {
 
 void loadMuxMidiNotes() {
   midiNotePreferences.begin(midiNoteStorageNamespace, true);
-  for (int channel = 0; channel < 16; channel++) {
-    char key[5];
-    snprintf(key, sizeof(key), "n%02d", channel);
-    muxMidiNotes[channel] = midiNotePreferences.getUChar(key, defaultMuxMidiNotes[channel]);
-    snprintf(key, sizeof(key), "t%02d", channel);
-    muxMessageTypes[channel] = wrapMuxMessageType(midiNotePreferences.getUChar(key, MUX_MESSAGE_NOTE));
-    muxMidiNotes[channel] = constrain(muxMidiNotes[channel],
-                                      valueMinimumForType(muxMessageTypes[channel], EDIT_TARGET_PAD),
-                                      valueMaximumForType(muxMessageTypes[channel], EDIT_TARGET_PAD));
-  }
-  for (int channel = 0; channel < 4; channel++) {
-    char key[5];
-    snprintf(key, sizeof(key), "c%02d", channel);
-    midiCCNumbers[channel] = midiNotePreferences.getUChar(key, defaultMidiCCNumbers[channel]);
-    midiCCNumbers[channel] = constrain(midiCCNumbers[channel], minEditableMidiController, maxEditableMidiController);
-  }
-  for (int channel = 0; channel < 2; channel++) {
-    char key[5];
-    snprintf(key, sizeof(key), "e%02d", channel);
-    encoderCCNumbers[channel] = midiNotePreferences.getUChar(key, defaultEncoderCCNumbers[channel]);
-    encoderCCNumbers[channel] = constrain(encoderCCNumbers[channel], minEditableMidiController, maxEditableMidiController);
+  for (int bank = 0; bank < numMidiBanks; bank++) {
+    for (int channel = 0; channel < 16; channel++) {
+      char key[7];
+      snprintf(key, sizeof(key), "b%dn%02d", bank, channel);
+      muxMidiNotes[bank][channel] = midiNotePreferences.getUChar(key, defaultMuxMidiNotes[channel]);
+      snprintf(key, sizeof(key), "b%dt%02d", bank, channel);
+      muxMessageTypes[bank][channel] = wrapMuxMessageType(midiNotePreferences.getUChar(key, MUX_MESSAGE_NOTE));
+      muxMidiNotes[bank][channel] = constrain(muxMidiNotes[bank][channel],
+                                              valueMinimumForType(muxMessageTypes[bank][channel], EDIT_TARGET_PAD),
+                                              valueMaximumForType(muxMessageTypes[bank][channel], EDIT_TARGET_PAD));
+    }
+
+    for (int channel = 0; channel < 4; channel++) {
+      char key[7];
+      snprintf(key, sizeof(key), "b%dc%02d", bank, channel);
+      midiCCNumbers[bank][channel] = midiNotePreferences.getUChar(key, defaultMidiCCNumbers[channel]);
+      midiCCNumbers[bank][channel] = constrain(midiCCNumbers[bank][channel], minEditableMidiController, maxEditableMidiController);
+    }
+
+    for (int channel = 0; channel < 2; channel++) {
+      char key[7];
+      snprintf(key, sizeof(key), "b%de%02d", bank, channel);
+      encoderCCNumbers[bank][channel] = midiNotePreferences.getUChar(key, defaultEncoderCCNumbers[channel]);
+      encoderCCNumbers[bank][channel] = constrain(encoderCCNumbers[bank][channel], minEditableMidiController, maxEditableMidiController);
+    }
   }
   selectedEditTarget = EDIT_TARGET_NONE;
   selectedMessageType = MUX_MESSAGE_NOTE;
@@ -239,13 +277,13 @@ void loadMuxMidiNotes() {
 
 void saveMuxMidiNotes() {
   if (selectedEditTarget == EDIT_TARGET_PAD && editedMuxChannel >= 0) {
-    muxMidiNotes[editedMuxChannel] = constrainSelectedValue(selectedMidiNote);
-    muxMessageTypes[editedMuxChannel] = wrapMuxMessageType(selectedMessageType);
+    muxMidiNotes[midiChannel][editedMuxChannel] = constrainSelectedValue(selectedMidiNote);
+    muxMessageTypes[midiChannel][editedMuxChannel] = wrapMuxMessageType(selectedMessageType);
   } else if (selectedEditTarget == EDIT_TARGET_POT && editedPotChannel >= 0) {
-    midiCCNumbers[editedPotChannel] = constrainSelectedValue(selectedMidiNote);
+    midiCCNumbers[midiChannel][editedPotChannel] = constrainSelectedValue(selectedMidiNote);
     selectedMessageType = MUX_MESSAGE_CONTROL_CHANGE;
   } else if (selectedEditTarget == EDIT_TARGET_ENCODER && editedEncoderChannel >= 0) {
-    encoderCCNumbers[editedEncoderChannel] = constrainSelectedValue(selectedMidiNote);
+    encoderCCNumbers[midiChannel][editedEncoderChannel] = constrainSelectedValue(selectedMidiNote);
     selectedMessageType = MUX_MESSAGE_CONTROL_CHANGE;
   } else {
     printCurrentMidiEditScreen(false);
@@ -253,30 +291,34 @@ void saveMuxMidiNotes() {
   }
 
   midiNotePreferences.begin(midiNoteStorageNamespace, false);
-  for (int channel = 0; channel < 16; channel++) {
-    char key[5];
-    snprintf(key, sizeof(key), "n%02d", channel);
-    midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrain(muxMidiNotes[channel],
-                                                                      valueMinimumForType(muxMessageTypes[channel], EDIT_TARGET_PAD),
-                                                                      valueMaximumForType(muxMessageTypes[channel], EDIT_TARGET_PAD))));
-    snprintf(key, sizeof(key), "t%02d", channel);
-    midiNotePreferences.putUChar(key, static_cast<uint8_t>(wrapMuxMessageType(muxMessageTypes[channel])));
-  }
-  for (int channel = 0; channel < 4; channel++) {
-    char key[5];
-    snprintf(key, sizeof(key), "c%02d", channel);
-    midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrain(midiCCNumbers[channel], minEditableMidiController, maxEditableMidiController)));
-  }
-  for (int channel = 0; channel < 2; channel++) {
-    char key[5];
-    snprintf(key, sizeof(key), "e%02d", channel);
-    midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrain(encoderCCNumbers[channel], minEditableMidiController, maxEditableMidiController)));
+  for (int bank = 0; bank < numMidiBanks; bank++) {
+    for (int channel = 0; channel < 16; channel++) {
+      char key[7];
+      snprintf(key, sizeof(key), "b%dn%02d", bank, channel);
+      midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrain(muxMidiNotes[bank][channel],
+                                                                        valueMinimumForType(muxMessageTypes[bank][channel], EDIT_TARGET_PAD),
+                                                                        valueMaximumForType(muxMessageTypes[bank][channel], EDIT_TARGET_PAD))));
+      snprintf(key, sizeof(key), "b%dt%02d", bank, channel);
+      midiNotePreferences.putUChar(key, static_cast<uint8_t>(wrapMuxMessageType(muxMessageTypes[bank][channel])));
+    }
+
+    for (int channel = 0; channel < 4; channel++) {
+      char key[7];
+      snprintf(key, sizeof(key), "b%dc%02d", bank, channel);
+      midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrain(midiCCNumbers[bank][channel], minEditableMidiController, maxEditableMidiController)));
+    }
+
+    for (int channel = 0; channel < 2; channel++) {
+      char key[7];
+      snprintf(key, sizeof(key), "b%de%02d", bank, channel);
+      midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrain(encoderCCNumbers[bank][channel], minEditableMidiController, maxEditableMidiController)));
+    }
   }
   midiNotePreferences.end();
   midiNoteMappingsSaved = true;
   printCurrentMidiEditScreen(true);
 #if DEBUG
-  Serial.println("Mux MIDI notes saved");
+  Serial.println("MIDI mappings saved");
 #endif
 }
 
@@ -286,8 +328,8 @@ void enterMidiNoteEditMode() {
   encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
   encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
   selectedEditTarget = EDIT_TARGET_NONE;
-  selectedMidiNote = constrain(muxMidiNotes[0], minEditableMidiNote, maxEditableMidiNote);
-  selectedMessageType = wrapMuxMessageType(muxMessageTypes[0]);
+  selectedMidiNote = constrain(muxMidiNotes[midiChannel][0], minEditableMidiNote, maxEditableMidiNote);
+  selectedMessageType = wrapMuxMessageType(muxMessageTypes[midiChannel][0]);
   editedMuxChannel = -1;
   editedPotChannel = -1;
   editedEncoderChannel = -1;
@@ -352,6 +394,9 @@ void switchMidiChannel(int direction) {
   midiChannel = (midiChannel + direction + 4) % 4;
   rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
+  for (int channel = 0; channel < 4; channel++) {
+    previousMidiCCValues[channel] = -1;
+  }
 #if DEBUG
   Serial.print("MIDI channel -> "); Serial.println(midiChannel);
 #endif
@@ -453,8 +498,8 @@ void handleMidiNoteEditMode() {
       editedMuxChannel = channel;
       editedPotChannel = -1;
       editedEncoderChannel = -1;
-      selectedMessageType = wrapMuxMessageType(muxMessageTypes[channel]);
-      selectedMidiNote = constrainSelectedValue(muxMidiNotes[channel]);
+      selectedMessageType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
+      selectedMidiNote = constrainSelectedValue(muxMidiNotes[midiChannel][channel]);
       lastEditEncoder1Position = rotaryEncoder1.readEncoder();
       lastEditEncoder2Position = rotaryEncoder2.readEncoder();
       midiNoteMappingsSaved = false;
@@ -475,7 +520,7 @@ void handleMidiNoteEditMode() {
       editedMuxChannel = -1;
       editedEncoderChannel = -1;
       selectedMessageType = MUX_MESSAGE_CONTROL_CHANGE;
-      selectedMidiNote = constrain(midiCCNumbers[channel], minEditableMidiController, maxEditableMidiController);
+      selectedMidiNote = constrain(midiCCNumbers[midiChannel][channel], minEditableMidiController, maxEditableMidiController);
       lastEditEncoder1Position = rotaryEncoder1.readEncoder();
       lastEditEncoder2Position = rotaryEncoder2.readEncoder();
       midiNoteMappingsSaved = false;
@@ -574,8 +619,8 @@ void loop() {
       bool previousState = (previousMuxValues >> channel) & 1;
       bool currentState  = (currentMuxValues  >> channel) & 1;
 
-      int muxType = wrapMuxMessageType(muxMessageTypes[channel]);
-      int muxValue = constrain(muxMidiNotes[channel],
+      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
+      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
                                valueMinimumForType(muxType, EDIT_TARGET_PAD),
                                valueMaximumForType(muxType, EDIT_TARGET_PAD));
 
@@ -609,11 +654,11 @@ void loop() {
       // Compare on mapped 0-127 value to avoid sub-step jitter
       int midiCCValue = map(rawValue, 0, 4095, 127, 0);
       if (midiCCValue != previousMidiCCValues[channel]) {
-        sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, midiCCNumbers[channel], midiCCValue);
+        sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, midiCCNumbers[midiChannel][channel], midiCCValue);
         previousMidiCCValues[channel] = midiCCValue;
 #if DEBUG
         Serial.print("Pot "); Serial.print(channel);
-        Serial.print(" -> CC "); Serial.print(midiCCNumbers[channel]);
+        Serial.print(" -> CC "); Serial.print(midiCCNumbers[midiChannel][channel]);
         Serial.print(" val "); Serial.print(midiCCValue);
         Serial.print(" ch "); Serial.println(midiChannel);
 #endif
@@ -625,21 +670,21 @@ void loop() {
     int encoder2Position = rotaryEncoder2.readEncoder();
 
     if (encoder1Position != encoder1Values[midiChannel]) {
-      sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, encoderCCNumbers[0], encoder1Position);
+      sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, encoderCCNumbers[midiChannel][0], encoder1Position);
       encoder1Values[midiChannel] = encoder1Position;
 #if DEBUG
       Serial.print("Enc1: "); Serial.print(encoder1Position);
-      Serial.print(" -> CC "); Serial.print(encoderCCNumbers[0]); Serial.print(" ch "); Serial.println(midiChannel);
+      Serial.print(" -> CC "); Serial.print(encoderCCNumbers[midiChannel][0]); Serial.print(" ch "); Serial.println(midiChannel);
 #endif
       printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
     }
 
     if (encoder2Position != encoder2Values[midiChannel]) {
-      sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, encoderCCNumbers[1], encoder2Position);
+      sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, encoderCCNumbers[midiChannel][1], encoder2Position);
       encoder2Values[midiChannel] = encoder2Position;
 #if DEBUG
       Serial.print("Enc2: "); Serial.print(encoder2Position);
-      Serial.print(" -> CC "); Serial.print(encoderCCNumbers[1]); Serial.print(" ch "); Serial.println(midiChannel);
+      Serial.print(" -> CC "); Serial.print(encoderCCNumbers[midiChannel][1]); Serial.print(" ch "); Serial.println(midiChannel);
 #endif
       printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
     }
