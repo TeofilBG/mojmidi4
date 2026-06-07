@@ -8,7 +8,7 @@
 #include "display.h"
 
 // Set to 1 to enable Serial debug output
-#define DEBUG 0
+#define DEBUG 1
 
 // Bluetooth MIDI interface provided by the Control Surface library
 BluetoothMIDI_Interface midi;
@@ -44,8 +44,8 @@ enum EditTargetType {
 };
 
 // Define the default MIDI values for the multiplexer buttons
-const int defaultMuxMidiNotes[16] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
-int muxMidiNotes[16] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
+const int defaultMuxMidiNotes[16] = {63, 62, 61, 60, 67, 66, 65, 64, 71, 70, 69, 68, 75, 74, 73, 72};
+int muxMidiNotes[16] = {63, 62, 61, 60, 67, 66, 65, 64, 71, 70, 69, 68, 75, 74, 73, 72};
 int muxMessageTypes[16] = {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
                           MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
                           MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
