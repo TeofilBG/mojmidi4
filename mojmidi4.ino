@@ -128,6 +128,13 @@ void loadMuxMidiNotes() {
 }
 
 void saveMuxMidiNotes() {
+  if (editedMuxChannel < 0) {
+    printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, false);
+    return;
+  }
+
+  muxMidiNotes[editedMuxChannel] = constrain(selectedMidiNote, minEditableMidiNote, maxEditableMidiNote);
+
   midiNotePreferences.begin(midiNoteStorageNamespace, false);
   for (int channel = 0; channel < 16; channel++) {
     char key[5];
@@ -271,13 +278,15 @@ void handleMidiNoteEditMode() {
     bool currentState  = (currentMuxValues  >> channel) & 1;
 
     if (!previousState && currentState) {
-      muxMidiNotes[channel] = selectedMidiNote;
       editedMuxChannel = channel;
+      selectedMidiNote = constrain(muxMidiNotes[channel], minEditableMidiNote, maxEditableMidiNote);
+      lastEditEncoder1Position = rotaryEncoder1.readEncoder();
+      lastEditEncoder2Position = rotaryEncoder2.readEncoder();
       midiNoteMappingsSaved = false;
       printMidiNoteEditScreen(selectedMidiNote, editedMuxChannel, false);
 #if DEBUG
       Serial.print("Mux Button "); Serial.print(channel);
-      Serial.print(" note set to "); Serial.println(selectedMidiNote);
+      Serial.print(" current note "); Serial.println(selectedMidiNote);
 #endif
     }
   }
