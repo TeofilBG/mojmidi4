@@ -8,7 +8,7 @@
 #include "display.h"
 
 // Set to 1 to enable Serial debug output
-#define DEBUG 0
+#define DEBUG 1
 
 // Bluetooth MIDI interface provided by the Control Surface library
 BluetoothMIDI_Interface midi;
@@ -701,6 +701,7 @@ void setup() {
 
   rotaryEncoder2.begin();
   rotaryEncoder2.setup(readEncoderISR2);
+  previousMuxValues = readMuxButtons();
   rotaryEncoder2.setBoundaries(0, 127, false);
   rotaryEncoder2.setAcceleration(100);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
