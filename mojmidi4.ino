@@ -4,7 +4,7 @@
 #include <AiEsp32RotaryEncoder.h>
 #include <OneButton.h>
 #include <Preferences.h>
-#include <Adafruit_NeoPixel.h>
+#include <FastLED.h>
 #include "display.h"
 
 // Set to 1 to enable Serial debug output
@@ -33,7 +33,7 @@ const int statusLedCount = 1;
 const unsigned long statusLedBlinkIntervalMs = 500;
 const uint8_t statusLedBlueBrightness = 64;
 
-Adafruit_NeoPixel statusLed(statusLedCount, STATUS_LED_PIN, NEO_GRB + NEO_KHZ800);
+CRGB statusLed[statusLedCount];
 bool statusLedOn = false;
 unsigned long lastStatusLedBlinkMs = 0;
 
@@ -191,9 +191,8 @@ void sendMidiMessage(MIDIMessageType type, int zeroBasedChannel, int data1, int 
 }
 
 void initializeStatusLed() {
-  statusLed.begin();
-  statusLed.clear();
-  statusLed.show();
+  FastLED.addLeds<WS2812B, STATUS_LED_PIN, GRB>(statusLed, statusLedCount);
+  FastLED.clear(true);
 }
 
 void updateStatusLed() {
@@ -202,12 +201,8 @@ void updateStatusLed() {
 
   lastStatusLedBlinkMs = now;
   statusLedOn = !statusLedOn;
-  if (statusLedOn) {
-    statusLed.setPixelColor(0, statusLed.Color(0, 0, statusLedBlueBrightness));
-  } else {
-    statusLed.clear();
-  }
-  statusLed.show();
+  statusLed[0] = statusLedOn ? CRGB(0, 0, statusLedBlueBrightness) : CRGB::Black;
+  FastLED.show();
 }
 
 

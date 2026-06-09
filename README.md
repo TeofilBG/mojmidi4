@@ -9,7 +9,7 @@ Install these Arduino libraries before compiling:
 - `OneButton`
 - `ResponsiveAnalogRead`
 - `AiEsp32RotaryEncoder`
-- `Adafruit NeoPixel`
+- `FastLED`
 
 
 
