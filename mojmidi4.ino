@@ -1,10 +1,10 @@
 #include <Arduino.h>
+#include <FastLED.h>
 #include <Control_Surface.h>
 #include <ResponsiveAnalogRead.h>
 #include <AiEsp32RotaryEncoder.h>
 #include <OneButton.h>
 #include <Preferences.h>
-#include <FastLED.h>
 #include "display.h"
 
 // Set to 1 to enable Serial debug output
