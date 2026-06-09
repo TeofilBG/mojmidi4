@@ -29,8 +29,9 @@ BluetoothMIDI_Interface midi;
 const int numMuxPads = 16;
 const int numPots = 6;
 const int numButtons = 10;
-const int statusLedCount = 2;
-const uint8_t statusLedBlueBrightness = 64;
+const int statusLedCount = numMuxPads;
+const uint8_t statusLedPassiveBrightness = 76;
+const uint8_t statusLedActiveBrightness = 255;
 
 CRGB statusLed[statusLedCount];
 
@@ -192,9 +193,26 @@ void initializeStatusLed() {
   FastLED.clear(true);
 }
 
+CRGB channelStatusColor(uint8_t brightness) {
+  switch (midiChannel) {
+    case 1:
+      return CRGB(brightness, 0, 0);
+    case 2:
+      return CRGB(0, brightness, 0);
+    case 3:
+      return CRGB(brightness, 0, brightness);
+    case 0:
+    default:
+      return CRGB(0, 0, brightness);
+  }
+}
+
 void updateHallPadStatusLeds(uint16_t hallPadStates) {
-  statusLed[0] = (hallPadStates & (1 << 0)) ? CRGB(0, 0, statusLedBlueBrightness) : CRGB::Black;
-  statusLed[1] = (hallPadStates & (1 << 1)) ? CRGB(0, 0, statusLedBlueBrightness) : CRGB::Black;
+  for (int channel = 0; channel < statusLedCount; channel++) {
+    bool isPressed = (hallPadStates >> channel) & 1;
+    uint8_t brightness = isPressed ? statusLedActiveBrightness : statusLedPassiveBrightness;
+    statusLed[channel] = channelStatusColor(brightness);
+  }
   FastLED.show();
 }
 
@@ -495,6 +513,7 @@ void switchMidiChannel(int direction) {
   Serial.print("MIDI channel -> "); Serial.println(midiChannel);
 #endif
   printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
+  updateHallPadStatusLeds(previousMuxValues);
 }
 
 void handleEncoderButton1Click() {

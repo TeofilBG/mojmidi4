@@ -24,7 +24,7 @@ This sketch is configured for the XIAO ESP32S3 Plus pinout:
 - MUX 2 potentiometers: COM/SIG = GPIO8, 6 analog potentiometers
 - MUX 3 digital buttons: COM/SIG = GPIO9, 10 digital buttons
 - OLED 0.96 inch SSD1306 I2C: SDA = GPIO5, SCL = GPIO6, address `0x3C`
-- Two addressable status LEDs in one chain: DIN = GPIO43. Both stay off until Hall pad 1 or 2 is pressed; pad 1 lights LED 1 blue and pad 2 lights LED 2 blue until release.
+- Sixteen addressable status LEDs in one chain: DIN = GPIO43. Each Hall pad controls the matching LED; idle LEDs glow at 30% in the current MIDI channel color and the pressed pad LED rises to 100% until release. Channel colors are CH1 blue, CH2 red, CH3 green, and CH4 purple.
 - Hall pads are scanned on all 16 MUX1 channels with `digitalRead(MUX1_SIG) == LOW`, using a 10 microsecond settle time after each mux channel change.
 
 ## MIDI note edit mode
