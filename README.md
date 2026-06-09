@@ -23,7 +23,7 @@ This sketch is configured for the XIAO ESP32S3 Plus pinout:
 - MUX 2 potentiometers: COM/SIG = GPIO8, 6 analog potentiometers
 - MUX 3 digital buttons: COM/SIG = GPIO9, 10 digital buttons
 - OLED 0.96 inch SSD1306 I2C: SDA = GPIO5, SCL = GPIO6, address `0x3C`
-- The Hall-effect pad baselines are calibrated once at boot, so leave the pads released while powering up/resetting.
+- Hall pads trigger when their analog value falls below `1500`, release above `1650`, and note velocity is calculated from the fastest downward value change before trigger.
 
 ## MIDI note edit mode
 
