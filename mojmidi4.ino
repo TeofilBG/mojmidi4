@@ -19,7 +19,7 @@ BluetoothMIDI_Interface midi;
 #define MUX_S3 4
 
 // XIAO ESP32S3 Plus MUX COM/SIG pins
-#define MUX1_SIG 7   // 16 analog Hall-effect pad switches
+#define MUX1_SIG 7   // 16 active-low Hall-effect pad switches
 #define MUX2_SIG 8   // 6 Potentiometers
 #define MUX3_SIG 9   // 10 Digital buttons
 
@@ -33,10 +33,7 @@ const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 uint16_t previousMuxValues = 0;
 uint16_t previousButtonMuxValues = 0;
 
-const int hallPressThreshold = 350;
-const int hallReleaseThreshold = 250;
-const int hallMaxPressure = 3000;
-int muxPadBaselines[numMuxPads] = {0};
+const int defaultHallPadVelocity = 127;
 int currentMuxPadVelocities[numMuxPads] = {0};
 
 enum MuxMessageType {
@@ -269,7 +266,7 @@ void selectMuxChannel(uint8_t channel) {
   digitalWrite(MUX_S1, (channel >> 1) & 0x01);
   digitalWrite(MUX_S2, (channel >> 2) & 0x01);
   digitalWrite(MUX_S3, (channel >> 3) & 0x01);
-  delayMicroseconds(5);
+  delayMicroseconds(10);
 }
 
 uint16_t readMuxDigitalInputs(int inputPin, int channelCount) {
@@ -283,38 +280,21 @@ uint16_t readMuxDigitalInputs(int inputPin, int channelCount) {
   return currentMuxValues;
 }
 
-uint16_t readMuxPadRaw(int channel) {
-  selectMuxChannel(channel);
-  return analogRead(MUX1_SIG);
-}
-
-void calibrateMuxPadBaselines() {
+void initializeMuxPadTracking() {
   for (int channel = 0; channel < numMuxPads; channel++) {
-    muxPadBaselines[channel] = readMuxPadRaw(channel);
     currentMuxPadVelocities[channel] = 0;
   }
-}
-
-int muxPadPressure(int channel, uint16_t rawValue) {
-  return abs(static_cast<int>(rawValue) - muxPadBaselines[channel]);
-}
-
-int muxPadVelocityFromPressure(int pressure) {
-  if (pressure < hallReleaseThreshold) return 0;
-  return constrain(map(pressure, hallPressThreshold, hallMaxPressure, 1, 127), 1, 127);
 }
 
 uint16_t readMuxHallPads() {
   uint16_t currentMuxValues = 0;
   for (int channel = 0; channel < numMuxPads; channel++) {
-    uint16_t rawValue = readMuxPadRaw(channel);
-    int pressure = muxPadPressure(channel, rawValue);
-    bool wasPressed = (previousMuxValues >> channel) & 1;
-    bool isPressed = pressure >= hallPressThreshold || (wasPressed && pressure >= hallReleaseThreshold);
+    selectMuxChannel(channel);
+    bool isPressed = digitalRead(MUX1_SIG) == LOW;
 
     if (isPressed) {
       currentMuxValues |= (1 << channel);
-      currentMuxPadVelocities[channel] = muxPadVelocityFromPressure(pressure);
+      currentMuxPadVelocities[channel] = defaultHallPadVelocity;
     } else {
       currentMuxPadVelocities[channel] = 0;
     }
@@ -663,7 +643,7 @@ void setup() {
   pinMode(MUX_S3, OUTPUT);
   selectMuxChannel(0);
 
-  pinMode(MUX1_SIG, INPUT);
+  pinMode(MUX1_SIG, INPUT_PULLUP);
   pinMode(MUX2_SIG, INPUT);
   pinMode(MUX3_SIG, INPUT_PULLUP);
   setupEncoderButtons();
@@ -674,7 +654,7 @@ void setup() {
     pots[i].setAnalogResolution(4096);
   }
 
-  calibrateMuxPadBaselines();
+  initializeMuxPadTracking();
 
   pinMode(ROTARY_ENCODER_A_PIN_1, INPUT_PULLUP);
   pinMode(ROTARY_ENCODER_B_PIN_1, INPUT_PULLUP);

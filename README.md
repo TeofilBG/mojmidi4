@@ -19,11 +19,11 @@ This sketch is configured for the XIAO ESP32S3 Plus pinout:
 - Encoder 1: A = GPIO44, B = GPIO38, switch = GPIO41
 - Encoder 2: A = GPIO39, B = GPIO40, switch = GPIO42
 - Shared HC4067 select pins are driven directly: S0 = GPIO1, S1 = GPIO2, S2 = GPIO3, S3 = GPIO4
-- MUX 1 pads: COM/SIG = GPIO7, 16 analog Hall-effect linear pad switches
+- MUX 1 pads: COM/SIG = GPIO7, 16 Hall-effect pad switches read as active-low digital inputs
 - MUX 2 potentiometers: COM/SIG = GPIO8, 6 analog potentiometers
 - MUX 3 digital buttons: COM/SIG = GPIO9, 10 digital buttons
 - OLED 0.96 inch SSD1306 I2C: SDA = GPIO5, SCL = GPIO6, address `0x3C`
-- Hall pads trigger when their analog value falls below `1500`, release above `1650`, and note velocity is calculated from the fastest downward value change before trigger.
+- Hall pads are scanned on all 16 MUX1 channels with `digitalRead(MUX1_SIG) == LOW`, using a 10 microsecond settle time after each mux channel change.
 
 ## MIDI note edit mode
 
