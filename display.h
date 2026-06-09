@@ -2,13 +2,13 @@
 #define DISPLAY_H
 
 #include "graphics.h"
-#ifdef U8X8_HAVE_HW_I2C
 #include <Wire.h>
-#endif
 
 const uint8_t OLED_I2C_ADDRESS = 0x3C;
+const uint8_t OLED_SDA_PIN = 5;
+const uint8_t OLED_SCL_PIN = 6;
 
-static U8G2_SSD1306_128X32_UNIVISION_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
+static U8G2_SSD1306_128X64_NONAME_F_HW_I2C display(U8G2_R0, U8X8_PIN_NONE);
 
 // Track what's currently shown to avoid redundant redraws
 static int lastDisplayChannel = -1;
@@ -16,6 +16,7 @@ static int lastDisplayEnc1 = -1;
 static int lastDisplayEnc2 = -1;
 
 inline void initializeDisplay() {
+  Wire.begin(OLED_SDA_PIN, OLED_SCL_PIN);
   display.setI2CAddress(OLED_I2C_ADDRESS * 2);
   if (!display.begin()) {
     Serial.println(F("SSD1306 allocation failed"));

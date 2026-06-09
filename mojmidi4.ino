@@ -18,22 +18,30 @@ BluetoothMIDI_Interface midi;
 // Bluetooth MIDI interface provided by the Control Surface library
 BluetoothMIDI_Interface midi;
 
-// Define the number of direct buttons and their pins
-const int numButtons = 8;
-const int buttonPins[numButtons] = {12, 13, 19, 23, 32, 33, 34, 35};
+// Bluetooth MIDI interface provided by the Control Surface library
+BluetoothMIDI_Interface midi;
 
-// Define the MIDI notes for the direct buttons
-const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7};
+// XIAO ESP32S3 Plus pinout
+const int muxSelectPinS0 = 1;
+const int muxSelectPinS1 = 2;
+const int muxSelectPinS2 = 3;
+const int muxSelectPinS3 = 4;
+const int muxPadInputPin = 7;
+const int muxPotInputPin = 8;
+const int muxButtonInputPin = 9;
 
-// Variables to store the current and previous states of the direct buttons
-int buttonStates[numButtons] = {0};
-int lastButtonStates[numButtons] = {0};
+const int numMuxPads = 16;
+const int numPots = 6;
+const int numButtons = 10;
 
-// Define the HC4067 multiplexer with the appropriate control pins
-HC4067 mp(18, 5, 17, 16); // S0, S1, S2, S3 pins
+// Define the MIDI notes for the 10 digital buttons on MUX 3
+const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
-const int muxInputPin = 0;
+// Define the HC4067 multiplexers with the shared select pins
+HC4067 mp(muxSelectPinS0, muxSelectPinS1, muxSelectPinS2, muxSelectPinS3);
+
 uint16_t previousMuxValues = 0;
+uint16_t previousButtonMuxValues = 0;
 
 enum MuxMessageType {
   MUX_MESSAGE_NOTE = 0,
@@ -53,14 +61,14 @@ const int numMidiBanks = 4;
 const int defaultMuxCCVelocity = 127;
 
 // Define the default MIDI values for the multiplexer buttons
-const int defaultMuxMidiNotes[16] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
-int muxMidiNotes[numMidiBanks][16] = {
+const int defaultMuxMidiNotes[numMuxPads] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
+int muxMidiNotes[numMidiBanks][numMuxPads] = {
   {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
   {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
   {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
   {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63}
 };
-int muxMessageTypes[numMidiBanks][16] = {
+int muxMessageTypes[numMidiBanks][numMuxPads] = {
   {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
@@ -78,7 +86,7 @@ int muxMessageTypes[numMidiBanks][16] = {
    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE}
 };
-int muxCCVelocities[numMidiBanks][16] = {
+int muxCCVelocities[numMidiBanks][numMuxPads] = {
   {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127},
   {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127},
   {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127},
@@ -91,33 +99,32 @@ const char midiNoteStorageNamespace[] = "mojmidi";
 
 Preferences midiNotePreferences;
 
-// Potentiometer signal pin
-const int potInputPin = 2;
-
-// ResponsiveAnalogRead objects for potentiometers (array replaces pot0..pot3)
-ResponsiveAnalogRead pots[4] = {
-  ResponsiveAnalogRead(potInputPin, true),
-  ResponsiveAnalogRead(potInputPin, true),
-  ResponsiveAnalogRead(potInputPin, true),
-  ResponsiveAnalogRead(potInputPin, true)
+// ResponsiveAnalogRead objects for the 6 potentiometers on MUX 2
+ResponsiveAnalogRead pots[numPots] = {
+  ResponsiveAnalogRead(muxPotInputPin, true),
+  ResponsiveAnalogRead(muxPotInputPin, true),
+  ResponsiveAnalogRead(muxPotInputPin, true),
+  ResponsiveAnalogRead(muxPotInputPin, true),
+  ResponsiveAnalogRead(muxPotInputPin, true),
+  ResponsiveAnalogRead(muxPotInputPin, true)
 };
 
 // Store previous mapped MIDI CC values (0-127) for change detection
-int previousMidiCCValues[4] = {-1, -1, -1, -1};
+int previousMidiCCValues[numPots] = {-1, -1, -1, -1, -1, -1};
 
 // Define default MIDI CC numbers for each potentiometer
-const int defaultMidiCCNumbers[4] = {1, 2, 3, 4};
-int midiCCNumbers[numMidiBanks][4] = {
-  {1, 2, 3, 4},
-  {1, 2, 3, 4},
-  {1, 2, 3, 4},
-  {1, 2, 3, 4}
+const int defaultMidiCCNumbers[numPots] = {1, 2, 3, 4, 5, 6};
+int midiCCNumbers[numMidiBanks][numPots] = {
+  {1, 2, 3, 4, 5, 6},
+  {1, 2, 3, 4, 5, 6},
+  {1, 2, 3, 4, 5, 6},
+  {1, 2, 3, 4, 5, 6}
 };
 
 const int minEditableMidiController = 0;
 const int maxEditableMidiController = 127;
 const int potSelectThreshold = 64;
-int lastEditPotValues[4] = {0, 0, 0, 0};
+int lastEditPotValues[numPots] = {0, 0, 0, 0, 0, 0};
 
 const int defaultEncoderCCNumbers[2] = {10, 11};
 int encoderCCNumbers[numMidiBanks][2] = {
@@ -128,8 +135,8 @@ int encoderCCNumbers[numMidiBanks][2] = {
 };
 
 // Define independent buttons for MIDI channel switching
-const int channelButton1 = 15;
-const int channelButton2 = 4;
+const int channelButton1 = 41;
+const int channelButton2 = 42;
 
 OneButton encoderButton1(channelButton1, true, true);
 OneButton encoderButton2(channelButton2, true, true);
@@ -150,17 +157,17 @@ int lastEditEncoder1Position = 0;
 int lastEditEncoder2Position = 0;
 
 // Rotary Encoder Pins and Setup
-#define ROTARY_ENCODER_A_PIN_1 26
-#define ROTARY_ENCODER_B_PIN_1 25
-#define ROTARY_ENCODER_A_PIN_2 27
-#define ROTARY_ENCODER_B_PIN_2 14
+#define ROTARY_ENCODER_A_PIN_1 44
+#define ROTARY_ENCODER_B_PIN_1 38
+#define ROTARY_ENCODER_A_PIN_2 39
+#define ROTARY_ENCODER_B_PIN_2 40
 #define ROTARY_ENCODER_STEPS 6
 
 AiEsp32RotaryEncoder rotaryEncoder1(ROTARY_ENCODER_A_PIN_1, ROTARY_ENCODER_B_PIN_1, -1, -1, ROTARY_ENCODER_STEPS);
 AiEsp32RotaryEncoder rotaryEncoder2(ROTARY_ENCODER_A_PIN_2, ROTARY_ENCODER_B_PIN_2, -1, -1, ROTARY_ENCODER_STEPS);
 
-int encoder1Values[4] = {64, 64, 64, 64};
-int encoder2Values[4] = {64, 64, 64, 64};
+int encoder1Values[numMidiBanks] = {64, 64, 64, 64};
+int encoder2Values[numMidiBanks] = {64, 64, 64, 64};
 
 // ISR for rotary encoders
 void IRAM_ATTR readEncoderISR1() {
@@ -261,21 +268,29 @@ void printCurrentMidiEditScreen(bool saved) {
   printMidiNoteEditScreen(selectedMidiNote, currentEditTypeLabel(), targetText, saved);
 }
 
-uint16_t readMuxButtons() {
+uint16_t readMuxDigitalInputs(int inputPin, int channelCount) {
   uint16_t currentMuxValues = 0;
-  for (int channel = 0; channel < 16; channel++) {
+  for (int channel = 0; channel < channelCount; channel++) {
     mp.setChannel(channel);
-    if (digitalRead(muxInputPin) == LOW) {
+    if (digitalRead(inputPin) == LOW) {
       currentMuxValues |= (1 << channel);
     }
   }
   return currentMuxValues;
 }
 
+uint16_t readMuxButtons() {
+  return readMuxDigitalInputs(muxPadInputPin, numMuxPads);
+}
+
+uint16_t readDirectButtons() {
+  return readMuxDigitalInputs(muxButtonInputPin, numButtons);
+}
+
 void loadMuxMidiNotes() {
   midiNotePreferences.begin(midiNoteStorageNamespace, true);
   for (int bank = 0; bank < numMidiBanks; bank++) {
-    for (int channel = 0; channel < 16; channel++) {
+    for (int channel = 0; channel < numMuxPads; channel++) {
       char key[7];
       snprintf(key, sizeof(key), "b%dn%02d", bank, channel);
       muxMidiNotes[bank][channel] = midiNotePreferences.getUChar(key, defaultMuxMidiNotes[channel]);
@@ -288,7 +303,7 @@ void loadMuxMidiNotes() {
                                               valueMaximumForType(muxMessageTypes[bank][channel], EDIT_TARGET_PAD));
     }
 
-    for (int channel = 0; channel < 4; channel++) {
+    for (int channel = 0; channel < numPots; channel++) {
       char key[7];
       snprintf(key, sizeof(key), "b%dc%02d", bank, channel);
       midiCCNumbers[bank][channel] = midiNotePreferences.getUChar(key, defaultMidiCCNumbers[channel]);
@@ -325,7 +340,7 @@ void saveMuxMidiNotes() {
 
   midiNotePreferences.begin(midiNoteStorageNamespace, false);
   for (int bank = 0; bank < numMidiBanks; bank++) {
-    for (int channel = 0; channel < 16; channel++) {
+    for (int channel = 0; channel < numMuxPads; channel++) {
       char key[7];
       snprintf(key, sizeof(key), "b%dn%02d", bank, channel);
       midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrain(muxMidiNotes[bank][channel],
@@ -337,7 +352,7 @@ void saveMuxMidiNotes() {
       midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrainMidiDataValue(muxCCVelocities[bank][channel])));
     }
 
-    for (int channel = 0; channel < 4; channel++) {
+    for (int channel = 0; channel < numPots; channel++) {
       char key[7];
       snprintf(key, sizeof(key), "b%dc%02d", bank, channel);
       midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrain(midiCCNumbers[bank][channel], minEditableMidiController, maxEditableMidiController)));
@@ -375,7 +390,7 @@ void enterMidiNoteEditMode() {
   previousMuxValues = readMuxButtons();
   lastEditEncoder1Position = rotaryEncoder1.readEncoder();
   lastEditEncoder2Position = rotaryEncoder2.readEncoder();
-  for (int channel = 0; channel < 4; channel++) {
+  for (int channel = 0; channel < numPots; channel++) {
     lastEditPotValues[channel] = readPotentiometer(channel);
   }
   printCurrentMidiEditScreen(false);
@@ -427,10 +442,10 @@ void selectEncoderForEdit(int encoderChannel) {
 void switchMidiChannel(int direction) {
   encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
   encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
-  midiChannel = (midiChannel + direction + 4) % 4;
+  midiChannel = (midiChannel + direction + numMidiBanks) % numMidiBanks;
   rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
-  for (int channel = 0; channel < 4; channel++) {
+  for (int channel = 0; channel < numPots; channel++) {
     previousMidiCCValues[channel] = -1;
   }
 #if DEBUG
@@ -525,7 +540,7 @@ void handleMidiNoteEditMode() {
   }
 
   uint16_t currentMuxValues = readMuxButtons();
-  for (int channel = 0; channel < 16; channel++) {
+  for (int channel = 0; channel < numMuxPads; channel++) {
     bool previousState = (previousMuxValues >> channel) & 1;
     bool currentState  = (currentMuxValues  >> channel) & 1;
 
@@ -549,7 +564,7 @@ void handleMidiNoteEditMode() {
     }
   }
 
-  for (int channel = 0; channel < 4; channel++) {
+  for (int channel = 0; channel < numPots; channel++) {
     int currentPotValue = readPotentiometer(channel);
     if (abs(currentPotValue - lastEditPotValues[channel]) >= potSelectThreshold) {
       if (selectedEditTarget == EDIT_TARGET_PAD && selectedMessageType == MUX_MESSAGE_CONTROL_CHANGE && channel == 0) {
@@ -585,7 +600,7 @@ void handleMidiNoteEditMode() {
 // Read a single potentiometer sample via the mux (ResponsiveAnalogRead handles smoothing)
 uint16_t readPotentiometer(int channel) {
   mp.setChannel(channel);
-  uint16_t value = analogRead(potInputPin);
+  uint16_t value = analogRead(muxPotInputPin);
   if (value < 204) value = 0; // Below 5% of 12-bit range -> treat as 0
   return value;
 }
@@ -599,16 +614,14 @@ void setup() {
 
   loadMuxMidiNotes();
 
-  for (int i = 0; i < numButtons; i++) {
-    pinMode(buttonPins[i], INPUT_PULLUP);
-  }
-
-  pinMode(muxInputPin, INPUT);
+  pinMode(muxPadInputPin, INPUT_PULLUP);
+  pinMode(muxButtonInputPin, INPUT_PULLUP);
+  pinMode(muxPotInputPin, INPUT);
   setupEncoderButtons();
 
   analogReadResolution(12);
 
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < numPots; i++) {
     pots[i].setAnalogResolution(4096);
   }
 
@@ -630,6 +643,7 @@ void setup() {
   rotaryEncoder2.setAcceleration(100);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
   previousMuxValues = readMuxButtons();
+  previousButtonMuxValues = readDirectButtons();
 
   initializeDisplay();
   printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
@@ -642,26 +656,27 @@ void loop() {
   if (midiNoteEditMode) {
     handleMidiNoteEditMode();
   } else if (midi.isConnected()) {
-    // --- Direct buttons ---
+    // --- Digital buttons on MUX 3 ---
+    uint16_t currentButtonMuxValues = readDirectButtons();
     for (int i = 0; i < numButtons; i++) {
-      buttonStates[i] = digitalRead(buttonPins[i]);
-      if (buttonStates[i] != lastButtonStates[i]) {
-        if (buttonStates[i] == LOW) {
-          sendMidiMessage(MIDIMessageType::NoteOn, 0, midiNotes[i], 127);
+      bool previousState = (previousButtonMuxValues >> i) & 1;
+      bool currentState  = (currentButtonMuxValues  >> i) & 1;
+
+      if (!previousState && currentState) {
+        sendMidiMessage(MIDIMessageType::NoteOn, 0, midiNotes[i], 127);
 #if DEBUG
-          Serial.print("Direct Button "); Serial.print(i); Serial.println(" pressed");
+        Serial.print("Direct MUX Button "); Serial.print(i); Serial.println(" pressed");
 #endif
-        } else {
-          sendMidiMessage(MIDIMessageType::NoteOff, 0, midiNotes[i], 127);
-        }
-        lastButtonStates[i] = buttonStates[i];
+      } else if (previousState && !currentState) {
+        sendMidiMessage(MIDIMessageType::NoteOff, 0, midiNotes[i], 127);
       }
     }
+    previousButtonMuxValues = currentButtonMuxValues;
 
     // --- Multiplexer buttons ---
     uint16_t currentMuxValues = readMuxButtons();
 
-    for (int channel = 0; channel < 16; channel++) {
+    for (int channel = 0; channel < numMuxPads; channel++) {
       bool previousState = (previousMuxValues >> channel) & 1;
       bool currentState  = (currentMuxValues  >> channel) & 1;
 
@@ -675,7 +690,7 @@ void loop() {
         if (muxType == MUX_MESSAGE_NOTE) {
           sendMidiMessage(MIDIMessageType::NoteOn, midiChannel, muxValue, 127);
         } else if (muxType == MUX_MESSAGE_CONTROL_CHANGE) {
-0          sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, muxValue, muxCCVelocity);
+          sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, muxValue, muxCCVelocity);
         } else if (muxType == MUX_MESSAGE_PROGRAM_CHANGE) {
           sendMidiMessage(MIDIMessageType::ProgramChange, midiChannel, muxValue, 0);
         }
@@ -694,7 +709,7 @@ void loop() {
     previousMuxValues = currentMuxValues;
 
     // --- Potentiometers ---
-    for (int channel = 0; channel < 4; channel++) {
+    for (int channel = 0; channel < numPots; channel++) {
       pots[channel].update(readPotentiometer(channel));
       uint16_t rawValue = pots[channel].getValue();
 

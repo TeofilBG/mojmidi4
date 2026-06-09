@@ -6,20 +6,20 @@
 
 namespace Graphics {
   const uint8_t TITLE_X = 24;
-  const uint8_t TITLE_Y = 7;
+  const uint8_t TITLE_Y = 10;
   const uint8_t CHANNEL_X = 38;
-  const uint8_t CHANNEL_Y = 23;
+  const uint8_t CHANNEL_Y = 37;
   const uint8_t ENC1_X = 1;
   const uint8_t ENC2_X = 86;
-  const uint8_t ENCODER_Y = 31;
+  const uint8_t ENCODER_Y = 58;
   const uint8_t EDIT_LABEL_X = 1;
-  const uint8_t EDIT_LABEL_Y = 18;
+  const uint8_t EDIT_LABEL_Y = 24;
   const uint8_t EDIT_NOTE_X = 82;
-  const uint8_t EDIT_NOTE_Y = 23;
+  const uint8_t EDIT_NOTE_Y = 43;
   const uint8_t EDIT_STATUS_X = 1;
-  const uint8_t EDIT_STATUS_Y = 31;
+  const uint8_t EDIT_STATUS_Y = 58;
   const uint8_t EDIT_TYPE_X = 72;
-  const uint8_t EDIT_TYPE_Y = 31;
+  const uint8_t EDIT_TYPE_Y = 58;
 
   inline void drawStatusScreen(U8G2 &oled, const char *channelText, const char *enc1Text, const char *enc2Text) {
     oled.clearBuffer();

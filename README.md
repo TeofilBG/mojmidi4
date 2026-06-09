@@ -12,20 +12,33 @@ Install these Arduino libraries before compiling:
 - `AiEsp32RotaryEncoder`
 
 
+
+## XIAO ESP32S3 Plus wiring
+
+This sketch is configured for the XIAO ESP32S3 Plus pinout:
+
+- Encoder 1: A = GPIO44, B = GPIO38, switch = GPIO41
+- Encoder 2: A = GPIO39, B = GPIO40, switch = GPIO42
+- Shared HC4067 select pins: S0 = GPIO1, S1 = GPIO2, S2 = GPIO3, S3 = GPIO4
+- MUX 1 pads: COM/SIG = GPIO7, 16 digital pad buttons
+- MUX 2 potentiometers: COM/SIG = GPIO8, 6 analog potentiometers
+- MUX 3 digital buttons: COM/SIG = GPIO9, 10 digital buttons
+- OLED 0.96 inch SSD1306 I2C: SDA = GPIO5, SCL = GPIO6, address `0x3C`
+
 ## MIDI note edit mode
 
 Long-press encoder button 2 to enter or exit MIDI note edit mode. In this mode,
 press one of the 16 mux buttons to load that pad's current settings, turn
 encoder 1 to choose the pad message type (`NOTE`, `CC`, or `PC`), and turn
-00encoder 2 to choose the MIDI value. When the selected pad type is `CC`, turn
+encoder 2 to choose the MIDI value. When the selected pad type is `CC`, turn
 potentiometer 1 to choose the CC press value/velocity that will be saved with
-that pad. Moving any other potentiometer selects that pot instead; pots stay as
-`CC`, and encoder 2 edits the pot's CC number. Single-click an encoder button
+that pad. Moving any other potentiometer selects that pot instead; all 6 pots stay as
+`CC`, and encoder 2 edits the selected pot's CC number. Single-click an encoder button
 to select that encoder's CC number for editing,
 and double-click encoder button 2 to save the selected target for the current
 controller channel/bank to ESP32 non-volatile memory. Repeat the same workflow on
-channels 1, 2, 3, and 4 to store different pad, pot, and encoder mappings per
-channel.
+channels 1, 2, 3, and 4 to store different pad, 6-pot, and encoder mappings
+per channel.
 
 This sketch is intended to be compiled from a folder that contains **one** active
 `.ino` file: `mojmidi4.ino`.
