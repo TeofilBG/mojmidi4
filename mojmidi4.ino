@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <Control_Surface.h>
-#include "HC4067.h"
 #include <ResponsiveAnalogRead.h>
 #include <AiEsp32RotaryEncoder.h>
 #include <OneButton.h>
@@ -13,22 +12,16 @@
 // Bluetooth MIDI interface provided by the Control Surface library
 BluetoothMIDI_Interface midi;
 
+// XIAO ESP32S3 Plus shared MUX select pins
+#define MUX_S0 1
+#define MUX_S1 2
+#define MUX_S2 3
+#define MUX_S3 4
 
-
-// Bluetooth MIDI interface provided by the Control Surface library
-BluetoothMIDI_Interface midi;
-
-// Bluetooth MIDI interface provided by the Control Surface library
-BluetoothMIDI_Interface midi;
-
-// XIAO ESP32S3 Plus pinout
-const int muxSelectPinS0 = 1;
-const int muxSelectPinS1 = 2;
-const int muxSelectPinS2 = 3;
-const int muxSelectPinS3 = 4;
-const int muxPadInputPin = 7;
-const int muxPotInputPin = 8;
-const int muxButtonInputPin = 9;
+// XIAO ESP32S3 Plus MUX COM/SIG pins
+#define MUX1_SIG 7   // 16 Hall/Pad buttons
+#define MUX2_SIG 8   // 6 Potentiometers
+#define MUX3_SIG 9   // 10 Digital buttons
 
 const int numMuxPads = 16;
 const int numPots = 6;
@@ -36,9 +29,6 @@ const int numButtons = 10;
 
 // Define the MIDI notes for the 10 digital buttons on MUX 3
 const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-
-// Define the HC4067 multiplexers with the shared select pins
-HC4067 mp(muxSelectPinS0, muxSelectPinS1, muxSelectPinS2, muxSelectPinS3);
 
 uint16_t previousMuxValues = 0;
 uint16_t previousButtonMuxValues = 0;
@@ -101,12 +91,12 @@ Preferences midiNotePreferences;
 
 // ResponsiveAnalogRead objects for the 6 potentiometers on MUX 2
 ResponsiveAnalogRead pots[numPots] = {
-  ResponsiveAnalogRead(muxPotInputPin, true),
-  ResponsiveAnalogRead(muxPotInputPin, true),
-  ResponsiveAnalogRead(muxPotInputPin, true),
-  ResponsiveAnalogRead(muxPotInputPin, true),
-  ResponsiveAnalogRead(muxPotInputPin, true),
-  ResponsiveAnalogRead(muxPotInputPin, true)
+  ResponsiveAnalogRead(MUX2_SIG, true),
+  ResponsiveAnalogRead(MUX2_SIG, true),
+  ResponsiveAnalogRead(MUX2_SIG, true),
+  ResponsiveAnalogRead(MUX2_SIG, true),
+  ResponsiveAnalogRead(MUX2_SIG, true),
+  ResponsiveAnalogRead(MUX2_SIG, true)
 };
 
 // Store previous mapped MIDI CC values (0-127) for change detection
@@ -268,10 +258,18 @@ void printCurrentMidiEditScreen(bool saved) {
   printMidiNoteEditScreen(selectedMidiNote, currentEditTypeLabel(), targetText, saved);
 }
 
+void selectMuxChannel(uint8_t channel) {
+  digitalWrite(MUX_S0, channel & 0x01);
+  digitalWrite(MUX_S1, (channel >> 1) & 0x01);
+  digitalWrite(MUX_S2, (channel >> 2) & 0x01);
+  digitalWrite(MUX_S3, (channel >> 3) & 0x01);
+  delayMicroseconds(5);
+}
+
 uint16_t readMuxDigitalInputs(int inputPin, int channelCount) {
   uint16_t currentMuxValues = 0;
   for (int channel = 0; channel < channelCount; channel++) {
-    mp.setChannel(channel);
+    selectMuxChannel(channel);
     if (digitalRead(inputPin) == LOW) {
       currentMuxValues |= (1 << channel);
     }
@@ -280,11 +278,11 @@ uint16_t readMuxDigitalInputs(int inputPin, int channelCount) {
 }
 
 uint16_t readMuxButtons() {
-  return readMuxDigitalInputs(muxPadInputPin, numMuxPads);
+  return readMuxDigitalInputs(MUX1_SIG, numMuxPads);
 }
 
 uint16_t readDirectButtons() {
-  return readMuxDigitalInputs(muxButtonInputPin, numButtons);
+  return readMuxDigitalInputs(MUX3_SIG, numButtons);
 }
 
 void loadMuxMidiNotes() {
@@ -599,8 +597,8 @@ void handleMidiNoteEditMode() {
 
 // Read a single potentiometer sample via the mux (ResponsiveAnalogRead handles smoothing)
 uint16_t readPotentiometer(int channel) {
-  mp.setChannel(channel);
-  uint16_t value = analogRead(muxPotInputPin);
+  selectMuxChannel(channel);
+  uint16_t value = analogRead(MUX2_SIG);
   if (value < 204) value = 0; // Below 5% of 12-bit range -> treat as 0
   return value;
 }
@@ -614,9 +612,15 @@ void setup() {
 
   loadMuxMidiNotes();
 
-  pinMode(muxPadInputPin, INPUT_PULLUP);
-  pinMode(muxButtonInputPin, INPUT_PULLUP);
-  pinMode(muxPotInputPin, INPUT);
+  pinMode(MUX_S0, OUTPUT);
+  pinMode(MUX_S1, OUTPUT);
+  pinMode(MUX_S2, OUTPUT);
+  pinMode(MUX_S3, OUTPUT);
+  selectMuxChannel(0);
+
+  pinMode(MUX1_SIG, INPUT_PULLUP);
+  pinMode(MUX2_SIG, INPUT);
+  pinMode(MUX3_SIG, INPUT_PULLUP);
   setupEncoderButtons();
 
   analogReadResolution(12);

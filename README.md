@@ -7,7 +7,6 @@ Install these Arduino libraries before compiling:
 - `Control_Surface`
 - `U8g2`
 - `OneButton`
-- `HC4067`
 - `ResponsiveAnalogRead`
 - `AiEsp32RotaryEncoder`
 
@@ -19,7 +18,7 @@ This sketch is configured for the XIAO ESP32S3 Plus pinout:
 
 - Encoder 1: A = GPIO44, B = GPIO38, switch = GPIO41
 - Encoder 2: A = GPIO39, B = GPIO40, switch = GPIO42
-- Shared HC4067 select pins: S0 = GPIO1, S1 = GPIO2, S2 = GPIO3, S3 = GPIO4
+- Shared HC4067 select pins are driven directly: S0 = GPIO1, S1 = GPIO2, S2 = GPIO3, S3 = GPIO4
 - MUX 1 pads: COM/SIG = GPIO7, 16 digital pad buttons
 - MUX 2 potentiometers: COM/SIG = GPIO8, 6 analog potentiometers
 - MUX 3 digital buttons: COM/SIG = GPIO9, 10 digital buttons
