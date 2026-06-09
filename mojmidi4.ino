@@ -674,7 +674,7 @@ void handleMidiNoteEditMode() {
 uint16_t readRawPotentiometer(int channel) {
   selectMuxChannel(channel);
   uint16_t value = analogRead(MUX2_SIG);
-  if (value < 204) value = 0; // Below 5% of 12-bit range -> treat as 0
+  if (value < 3) value = 0;
   return value;
 }
 
