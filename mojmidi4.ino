@@ -7,7 +7,7 @@
 #include "display.h"
 
 // Set to 1 to enable Serial debug output
-#define DEBUG 0
+#define DEBUG 1
 
 // Bluetooth MIDI interface provided by the Control Surface library
 BluetoothMIDI_Interface midi;
@@ -33,12 +33,10 @@ const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 uint16_t previousMuxValues = 0;
 uint16_t previousButtonMuxValues = 0;
 
-const int hallTriggerThreshold = 1500;
-const int hallReleaseThreshold = 1650;
-const int hallMinVelocityDelta = 5;
-const int hallMaxVelocityDelta = 200;
-int muxPadLastValues[numMuxPads] = {0};
-int muxPadMaxDeltas[numMuxPads] = {0};
+const int hallPressThreshold = 350;
+const int hallReleaseThreshold = 250;
+const int hallMaxPressure = 3000;
+int muxPadBaselines[numMuxPads] = {0};
 int currentMuxPadVelocities[numMuxPads] = {0};
 
 enum MuxMessageType {
@@ -290,48 +288,36 @@ uint16_t readMuxPadRaw(int channel) {
   return analogRead(MUX1_SIG);
 }
 
-void initializeMuxPadTracking() {
+void calibrateMuxPadBaselines() {
   for (int channel = 0; channel < numMuxPads; channel++) {
-    muxPadLastValues[channel] = readMuxPadRaw(channel);
-    muxPadMaxDeltas[channel] = 0;
+    muxPadBaselines[channel] = readMuxPadRaw(channel);
     currentMuxPadVelocities[channel] = 0;
   }
 }
 
-int muxPadVelocityFromDelta(int maxDelta) {
-  return map(constrain(maxDelta, hallMinVelocityDelta, hallMaxVelocityDelta),
-             hallMinVelocityDelta,
-             hallMaxVelocityDelta,
-             1,
-             127);
+int muxPadPressure(int channel, uint16_t rawValue) {
+  return abs(static_cast<int>(rawValue) - muxPadBaselines[channel]);
+}
+
+int muxPadVelocityFromPressure(int pressure) {
+  if (pressure < hallReleaseThreshold) return 0;
+  return constrain(map(pressure, hallPressThreshold, hallMaxPressure, 1, 127), 1, 127);
 }
 
 uint16_t readMuxHallPads() {
   uint16_t currentMuxValues = 0;
   for (int channel = 0; channel < numMuxPads; channel++) {
-    int value = readMuxPadRaw(channel);
-    int delta = muxPadLastValues[channel] - value;
-    if (delta > muxPadMaxDeltas[channel]) {
-      muxPadMaxDeltas[channel] = delta;
-    }
-
+    uint16_t rawValue = readMuxPadRaw(channel);
+    int pressure = muxPadPressure(channel, rawValue);
     bool wasPressed = (previousMuxValues >> channel) & 1;
-    bool isPressed = wasPressed;
-
-    if (!wasPressed && value < hallTriggerThreshold) {
-      isPressed = true;
-      currentMuxPadVelocities[channel] = muxPadVelocityFromDelta(muxPadMaxDeltas[channel]);
-    } else if (wasPressed && value > hallReleaseThreshold) {
-      isPressed = false;
-      muxPadMaxDeltas[channel] = 0;
-      currentMuxPadVelocities[channel] = 0;
-    }
+    bool isPressed = pressure >= hallPressThreshold || (wasPressed && pressure >= hallReleaseThreshold);
 
     if (isPressed) {
       currentMuxValues |= (1 << channel);
+      currentMuxPadVelocities[channel] = muxPadVelocityFromPressure(pressure);
+    } else {
+      currentMuxPadVelocities[channel] = 0;
     }
-
-    muxPadLastValues[channel] = value;
   }
   return currentMuxValues;
 }
@@ -688,7 +674,7 @@ void setup() {
     pots[i].setAnalogResolution(4096);
   }
 
-  initializeMuxPadTracking();
+  calibrateMuxPadBaselines();
 
   pinMode(ROTARY_ENCODER_A_PIN_1, INPUT_PULLUP);
   pinMode(ROTARY_ENCODER_B_PIN_1, INPUT_PULLUP);
@@ -703,6 +689,7 @@ void setup() {
 
   rotaryEncoder2.begin();
   rotaryEncoder2.setup(readEncoderISR2);
+  previousMuxValues = readMuxButtons();
   rotaryEncoder2.setBoundaries(0, 127, false);
   rotaryEncoder2.setAcceleration(100);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
