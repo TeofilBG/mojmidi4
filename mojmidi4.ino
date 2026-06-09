@@ -29,13 +29,10 @@ BluetoothMIDI_Interface midi;
 const int numMuxPads = 16;
 const int numPots = 6;
 const int numButtons = 10;
-const int statusLedCount = 1;
-const unsigned long statusLedBlinkIntervalMs = 500;
+const int statusLedCount = 2;
 const uint8_t statusLedBlueBrightness = 64;
 
 CRGB statusLed[statusLedCount];
-bool statusLedOn = false;
-unsigned long lastStatusLedBlinkMs = 0;
 
 // Define the MIDI notes for the 10 digital buttons on MUX 3
 const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -195,13 +192,9 @@ void initializeStatusLed() {
   FastLED.clear(true);
 }
 
-void updateStatusLed() {
-  unsigned long now = millis();
-  if (now - lastStatusLedBlinkMs < statusLedBlinkIntervalMs) return;
-
-  lastStatusLedBlinkMs = now;
-  statusLedOn = !statusLedOn;
-  statusLed[0] = statusLedOn ? CRGB(0, 0, statusLedBlueBrightness) : CRGB::Black;
+void updateHallPadStatusLeds(uint16_t hallPadStates) {
+  statusLed[0] = (hallPadStates & (1 << 0)) ? CRGB(0, 0, statusLedBlueBrightness) : CRGB::Black;
+  statusLed[1] = (hallPadStates & (1 << 1)) ? CRGB(0, 0, statusLedBlueBrightness) : CRGB::Black;
   FastLED.show();
 }
 
@@ -325,6 +318,7 @@ uint16_t readMuxHallPads() {
       currentMuxPadVelocities[channel] = 0;
     }
   }
+  updateHallPadStatusLeds(currentMuxValues);
   return currentMuxValues;
 }
 
@@ -708,7 +702,6 @@ void setup() {
 }
 
 void loop() {
-  updateStatusLed();
   midi.update();
   tickEncoderButtons();
 
