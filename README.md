@@ -19,15 +19,16 @@ This sketch is configured for the XIAO ESP32S3 Plus pinout:
 - Encoder 1: A = GPIO44, B = GPIO38, switch = GPIO41
 - Encoder 2: A = GPIO39, B = GPIO40, switch = GPIO42
 - Shared HC4067 select pins are driven directly: S0 = GPIO1, S1 = GPIO2, S2 = GPIO3, S3 = GPIO4
-- MUX 1 pads: COM/SIG = GPIO7, 16 digital pad buttons
+- MUX 1 pads: COM/SIG = GPIO7, 16 analog Hall-effect linear pad switches
 - MUX 2 potentiometers: COM/SIG = GPIO8, 6 analog potentiometers
 - MUX 3 digital buttons: COM/SIG = GPIO9, 10 digital buttons
 - OLED 0.96 inch SSD1306 I2C: SDA = GPIO5, SCL = GPIO6, address `0x3C`
+- The Hall-effect pad baselines are calibrated once at boot, so leave the pads released while powering up/resetting.
 
 ## MIDI note edit mode
 
 Long-press encoder button 2 to enter or exit MIDI note edit mode. In this mode,
-press one of the 16 mux buttons to load that pad's current settings, turn
+press one of the 16 Hall-effect pads to load that pad's current settings, turn
 encoder 1 to choose the pad message type (`NOTE`, `CC`, or `PC`), and turn
 encoder 2 to choose the MIDI value. When the selected pad type is `CC`, turn
 potentiometer 1 to choose the CC press value/velocity that will be saved with
