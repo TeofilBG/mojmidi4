@@ -275,7 +275,9 @@ int midiDataValueFromPot(uint16_t rawValue) {
 }
 
 bool midiValueChangedEnough(int previousValue, int currentValue) {
-  return previousValue < 0 || abs(currentValue - previousValue) > potMidiDeadband;
+  if (previousValue < 0) return true;
+  if (currentValue == 0 && previousValue != 0) return true;
+  return abs(currentValue - previousValue) > potMidiDeadband;
 }
 
 int currentMidiBank() {
@@ -678,18 +680,27 @@ uint16_t readRawPotentiometer(int channel) {
   return value;
 }
 
+void resetPotFilterToValue(int channel, uint16_t value) {
+  potMovingAverageSums[channel] = 0;
+  for (int i = 0; i < potMovingAverageSamples; i++) {
+    potMovingAverageReadings[channel][i] = value;
+    potMovingAverageSums[channel] += value;
+  }
+  potMovingAverageIndexes[channel] = 0;
+  stablePotValues[channel] = value;
+  potFiltersInitialized[channel] = true;
+}
+
 uint16_t readPotentiometer(int channel) {
   uint16_t rawValue = readRawPotentiometer(channel);
 
+  if (rawValue == 0) {
+    resetPotFilterToValue(channel, 0);
+    return 0;
+  }
+
   if (!potFiltersInitialized[channel]) {
-    potMovingAverageSums[channel] = 0;
-    for (int i = 0; i < potMovingAverageSamples; i++) {
-      potMovingAverageReadings[channel][i] = rawValue;
-      potMovingAverageSums[channel] += rawValue;
-    }
-    potMovingAverageIndexes[channel] = 0;
-    stablePotValues[channel] = rawValue;
-    potFiltersInitialized[channel] = true;
+    resetPotFilterToValue(channel, rawValue);
     return stablePotValues[channel];
   }
 
