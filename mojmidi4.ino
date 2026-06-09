@@ -125,7 +125,15 @@ int midiCCNumbers[numMidiBanks][numPots] = {
 const int minEditableMidiController = 0;
 const int maxEditableMidiController = 127;
 const int potSelectThreshold = 64;
+const int potMovingAverageSamples = 8;
+const int potAnalogDeadband = 8;
+const int potMidiDeadband = 1;
 int lastEditPotValues[numPots] = {0, 0, 0, 0, 0, 0};
+uint16_t potMovingAverageReadings[numPots][potMovingAverageSamples] = {0};
+uint32_t potMovingAverageSums[numPots] = {0};
+uint8_t potMovingAverageIndexes[numPots] = {0};
+bool potFiltersInitialized[numPots] = {false};
+uint16_t stablePotValues[numPots] = {0};
 
 const int defaultEncoderCCNumbers[2] = {10, 11};
 int encoderCCNumbers[numMidiBanks][2] = {
@@ -263,7 +271,11 @@ int constrainMidiDataValue(int value) {
 }
 
 int midiDataValueFromPot(uint16_t rawValue) {
-  return constrainMidiDataValue(map(rawValue, 0, 4095, 127, 0));
+  return constrainMidiDataValue(map(rawValue, 0, 4095, 0, 127));
+}
+
+bool midiValueChangedEnough(int previousValue, int currentValue) {
+  return previousValue < 0 || abs(currentValue - previousValue) > potMidiDeadband;
 }
 
 int currentMidiBank() {
@@ -659,12 +671,40 @@ void handleMidiNoteEditMode() {
   previousMuxValues = currentMuxValues;
 }
 
-// Read a single potentiometer sample via the mux (ResponsiveAnalogRead handles smoothing)
-uint16_t readPotentiometer(int channel) {
+uint16_t readRawPotentiometer(int channel) {
   selectMuxChannel(channel);
   uint16_t value = analogRead(MUX2_SIG);
   if (value < 204) value = 0; // Below 5% of 12-bit range -> treat as 0
   return value;
+}
+
+uint16_t readPotentiometer(int channel) {
+  uint16_t rawValue = readRawPotentiometer(channel);
+
+  if (!potFiltersInitialized[channel]) {
+    potMovingAverageSums[channel] = 0;
+    for (int i = 0; i < potMovingAverageSamples; i++) {
+      potMovingAverageReadings[channel][i] = rawValue;
+      potMovingAverageSums[channel] += rawValue;
+    }
+    potMovingAverageIndexes[channel] = 0;
+    stablePotValues[channel] = rawValue;
+    potFiltersInitialized[channel] = true;
+    return stablePotValues[channel];
+  }
+
+  uint8_t index = potMovingAverageIndexes[channel];
+  potMovingAverageSums[channel] -= potMovingAverageReadings[channel][index];
+  potMovingAverageReadings[channel][index] = rawValue;
+  potMovingAverageSums[channel] += rawValue;
+  potMovingAverageIndexes[channel] = (index + 1) % potMovingAverageSamples;
+
+  uint16_t averageValue = potMovingAverageSums[channel] / potMovingAverageSamples;
+  if (abs(static_cast<int>(averageValue) - static_cast<int>(stablePotValues[channel])) >= potAnalogDeadband) {
+    stablePotValues[channel] = averageValue;
+  }
+
+  return stablePotValues[channel];
 }
 
 void setup() {
@@ -786,7 +826,7 @@ void loop() {
 
       // Compare on mapped 0-127 value to avoid sub-step jitter
       int midiCCValue = midiDataValueFromPot(rawValue);
-      if (midiCCValue != previousMidiCCValues[channel]) {
+      if (midiValueChangedEnough(previousMidiCCValues[channel], midiCCValue)) {
         sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, midiCCNumbers[midiChannel][channel], midiCCValue);
         previousMidiCCValues[channel] = midiCCValue;
 #if DEBUG
