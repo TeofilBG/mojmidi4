@@ -4,6 +4,7 @@
 #include <AiEsp32RotaryEncoder.h>
 #include <OneButton.h>
 #include <Preferences.h>
+#include <Adafruit_NeoPixel.h>
 #include "display.h"
 
 // Set to 1 to enable Serial debug output
@@ -23,9 +24,18 @@ BluetoothMIDI_Interface midi;
 #define MUX2_SIG 8   // 6 Potentiometers
 #define MUX3_SIG 9   // 10 Digital buttons
 
+#define STATUS_LED_PIN 43
+
 const int numMuxPads = 16;
 const int numPots = 6;
 const int numButtons = 10;
+const int statusLedCount = 1;
+const unsigned long statusLedBlinkIntervalMs = 500;
+const uint8_t statusLedBlueBrightness = 64;
+
+Adafruit_NeoPixel statusLed(statusLedCount, STATUS_LED_PIN, NEO_GRB + NEO_KHZ800);
+bool statusLedOn = false;
+unsigned long lastStatusLedBlinkMs = 0;
 
 // Define the MIDI notes for the 10 digital buttons on MUX 3
 const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
@@ -179,6 +189,27 @@ void sendMidiMessage(MIDIMessageType type, int zeroBasedChannel, int data1, int 
   midi.sendChannelMessage(type, midiChannelFromZeroBased(zeroBasedChannel), data1, data2);
   midi.sendNow();
 }
+
+void initializeStatusLed() {
+  statusLed.begin();
+  statusLed.clear();
+  statusLed.show();
+}
+
+void updateStatusLed() {
+  unsigned long now = millis();
+  if (now - lastStatusLedBlinkMs < statusLedBlinkIntervalMs) return;
+
+  lastStatusLedBlinkMs = now;
+  statusLedOn = !statusLedOn;
+  if (statusLedOn) {
+    statusLed.setPixelColor(0, statusLed.Color(0, 0, statusLedBlueBrightness));
+  } else {
+    statusLed.clear();
+  }
+  statusLed.show();
+}
+
 
 const char *muxMessageTypeLabel(int messageType) {
   switch (messageType) {
@@ -630,6 +661,7 @@ uint16_t readPotentiometer(int channel) {
 
 void setup() {
   Serial.begin(115200);
+  initializeStatusLed();
   Serial.println("Initializing Bluetooth...");
   midi.setName("EUCALIPTUS MIDI RED"); ///////////////////////////////////////////////// NAME THE MIDI CONTROLLER
   midi.begin();
@@ -681,6 +713,7 @@ void setup() {
 }
 
 void loop() {
+  updateStatusLed();
   midi.update();
   tickEncoderButtons();
 
