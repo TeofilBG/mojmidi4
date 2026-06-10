@@ -651,7 +651,7 @@ void handleMidiNoteEditMode() {
   for (int channel = 0; channel < numPots; channel++) {
     int currentPotValue = readPotentiometer(channel);
     if (abs(currentPotValue - lastEditPotValues[channel]) >= potSelectThreshold) {
-      if (selectedEditTarget == EDIT_TARGET_PAD && selectedMessageType == MUX_MESSAGE_CONTROL_CHANGE && channel == 0) {
+      if (selectedEditTarget == EDIT_TARGET_PAD && selectedMessageType == MUX_MESSAGE_CONTROL_CHANGE && channel == 1) {
         selectedMuxCCVelocity = midiDataValueFromPot(currentPotValue);
         midiNoteMappingsSaved = false;
         printCurrentMidiEditScreen(false);

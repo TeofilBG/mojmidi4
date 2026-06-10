@@ -41,7 +41,7 @@ Long-press encoder button 2 to enter or exit MIDI note edit mode. In this mode,
 press one of the 16 Hall-effect pads to load that pad's current settings, turn
 encoder 1 to choose the pad message type (`NOTE`, `CC`, or `PC`), and turn
 encoder 2 to choose the MIDI value. When the selected pad type is `CC`, turn
-potentiometer 1 to choose the CC press value/velocity that will be saved with
+potentiometer 2 to choose the CC press value/velocity that will be saved with
 that pad. Moving any other potentiometer selects that pot instead; all 6 pots stay as
 `CC`, and encoder 2 edits the selected pot's CC number. Single-click an encoder button
 to select that encoder's CC number for editing,
