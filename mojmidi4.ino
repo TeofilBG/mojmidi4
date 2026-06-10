@@ -64,6 +64,37 @@ CRGB statusLed[statusLedCount];
 // Define the MIDI notes for the 10 digital buttons on MUX 3
 const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
+// Bluetooth MIDI interface provided by the Control Surface library
+BluetoothMIDI_Interface midi;
+
+// XIAO ESP32S3 Plus shared MUX select pins
+#define MUX_S0 1
+#define MUX_S1 2
+#define MUX_S2 3
+#define MUX_S3 4
+
+// XIAO ESP32S3 Plus MUX COM/SIG pins
+#define MUX1_SIG 7   // 16 active-low Hall-effect pad switches
+#define MUX2_SIG 8   // 6 Potentiometers
+#define MUX3_SIG 9   // 10 Digital buttons
+
+#define STATUS_LED_PIN 43
+
+const int numMuxPads = 16;
+const int numPots = 6;
+const int numButtons = 10;
+const int numMidiBanks = 4;
+const int shiftButtonIndex = 5; // Digital button 6 (1-based) on MUX 3
+const int channelSelectButtonIndexes[numMidiBanks] = {3, 4, 6, 7}; // Buttons 4, 5, 7, 8 select channels 1-4 while SHIFT is held
+const int statusLedCount = numMuxPads;
+const uint8_t statusLedPassiveBrightness = 76;
+const uint8_t statusLedActiveBrightness = 255;
+
+CRGB statusLed[statusLedCount];
+
+// Define the MIDI notes for the 10 digital buttons on MUX 3
+const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+
 uint16_t previousMuxValues = 0;
 uint16_t previousButtonMuxValues = 0;
 bool digitalButtonNoteActive[numButtons] = {false};
