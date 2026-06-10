@@ -29,8 +29,8 @@ BluetoothMIDI_Interface midi;
 const int numMuxPads = 16;
 const int numPots = 6;
 const int numButtons = 10;
-const int shiftButtonIndex = 6; // Digital button 7 (1-based) on MUX 3
-const int channelSelectButtonStartIndex = 2; // Digital buttons 3-6 (1-based) select channels 1-4 while SHIFT is held
+const int shiftButtonIndex = 5; // Digital button 6 (1-based) on MUX 3
+const int channelSelectButtonIndexes[numMidiBanks] = {3, 4, 6, 7}; // Buttons 4, 5, 7, 8 select channels 1-4 while SHIFT is held
 const int statusLedCount = numMuxPads;
 const uint8_t statusLedPassiveBrightness = 76;
 const uint8_t statusLedActiveBrightness = 255;
@@ -792,11 +792,17 @@ void loop() {
     for (int i = 0; i < numButtons; i++) {
       bool previousState = (previousButtonMuxValues >> i) & 1;
       bool currentState  = (currentButtonMuxValues  >> i) & 1;
-      bool isChannelSelectButton = i >= channelSelectButtonStartIndex && i < channelSelectButtonStartIndex + numMidiBanks;
+      int selectedChannel = -1;
+      for (int channel = 0; channel < numMidiBanks; channel++) {
+        if (i == channelSelectButtonIndexes[channel]) {
+          selectedChannel = channel;
+          break;
+        }
+      }
 
       if (!previousState && currentState) {
-        if (shiftHeld && isChannelSelectButton) {
-          selectMidiChannel(i - channelSelectButtonStartIndex);
+        if (shiftHeld && selectedChannel >= 0) {
+          selectMidiChannel(selectedChannel);
         } else if (i != shiftButtonIndex) {
           sendMidiMessage(MIDIMessageType::NoteOn, 0, midiNotes[i], 127);
           digitalButtonNoteActive[i] = true;

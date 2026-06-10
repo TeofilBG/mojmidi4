@@ -31,7 +31,7 @@ This sketch is configured for the XIAO ESP32S3 Plus pinout:
 ## Channel selection
 
 Encoder button single-clicks no longer change MIDI channels during normal play.
-Hold digital button 7 as SHIFT and press digital buttons 3, 4, 5, or 6 to select
+Hold digital button 6 as SHIFT and press digital buttons 4, 5, 7, or 8 to select
 MIDI channels 1, 2, 3, or 4. Without SHIFT held, the digital buttons keep their
 normal MIDI note behavior. Encoder long-press/menu behavior is unchanged.
 
