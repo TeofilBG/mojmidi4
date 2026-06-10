@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include "lights.h"
+#include <FastLED.h>
 #include <Control_Surface.h>
 #include <ResponsiveAnalogRead.h>
 #include <AiEsp32RotaryEncoder.h>
@@ -30,6 +30,37 @@ const int numButtons = 10;
 const int numMidiBanks = 4;
 const int shiftButtonIndex = 5; // Digital button 6 (1-based) on MUX 3
 const int channelSelectButtonIndexes[numMidiBanks] = {3, 4, 6, 7}; // Buttons 4, 5, 7, 8 select channels 1-4 while SHIFT is held
+// Define the MIDI notes for the 10 digital buttons on MUX 3
+const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+
+// Bluetooth MIDI interface provided by the Control Surface library
+BluetoothMIDI_Interface midi;
+
+// XIAO ESP32S3 Plus shared MUX select pins
+#define MUX_S0 1
+#define MUX_S1 2
+#define MUX_S2 3
+#define MUX_S3 4
+
+// XIAO ESP32S3 Plus MUX COM/SIG pins
+#define MUX1_SIG 7   // 16 active-low Hall-effect pad switches
+#define MUX2_SIG 8   // 6 Potentiometers
+#define MUX3_SIG 9   // 10 Digital buttons
+
+#define STATUS_LED_PIN 43
+
+const int numMuxPads = 16;
+const int numPots = 6;
+const int numButtons = 10;
+const int numMidiBanks = 4;
+const int shiftButtonIndex = 5; // Digital button 6 (1-based) on MUX 3
+const int channelSelectButtonIndexes[numMidiBanks] = {3, 4, 6, 7}; // Buttons 4, 5, 7, 8 select channels 1-4 while SHIFT is held
+const int statusLedCount = numMuxPads;
+const uint8_t statusLedPassiveBrightness = 76;
+const uint8_t statusLedActiveBrightness = 255;
+
+CRGB statusLed[statusLedCount];
+
 // Define the MIDI notes for the 10 digital buttons on MUX 3
 const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
@@ -191,6 +222,35 @@ void sendMidiMessage(MIDIMessageType type, int zeroBasedChannel, int data1, int 
   midi.sendNow();
 }
 
+void initializeStatusLed() {
+  FastLED.addLeds<WS2812B, STATUS_LED_PIN, GRB>(statusLed, statusLedCount);
+  FastLED.clear(true);
+}
+
+CRGB channelStatusColor(uint8_t brightness) {
+  switch (midiChannel) {
+    case 1:
+      return CRGB(brightness, 0, 0);
+    case 2:
+      return CRGB(0, brightness, 0);
+    case 3:
+      return CRGB(brightness, 0, brightness);
+    case 0:
+    default:
+      return CRGB(0, 0, brightness);
+  }
+}
+
+void updateHallPadStatusLeds(uint16_t hallPadStates) {
+  for (int channel = 0; channel < statusLedCount; channel++) {
+    bool isPressed = (hallPadStates >> channel) & 1;
+    uint8_t brightness = isPressed ? statusLedActiveBrightness : statusLedPassiveBrightness;
+    statusLed[channel] = channelStatusColor(brightness);
+  }
+  FastLED.show();
+}
+
+
 const char *muxMessageTypeLabel(int messageType) {
   switch (messageType) {
     case MUX_MESSAGE_CONTROL_CHANGE:
@@ -316,7 +376,7 @@ uint16_t readMuxHallPads() {
       currentMuxPadVelocities[channel] = 0;
     }
   }
-  updateHallPadStatusLeds(currentMuxValues, midiChannel);
+  updateHallPadStatusLeds(currentMuxValues);
   return currentMuxValues;
 }
 
@@ -493,7 +553,7 @@ void applyMidiChannelChange(int newMidiChannel) {
   Serial.print("MIDI channel -> "); Serial.println(midiChannel);
 #endif
   printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
-  updateHallPadStatusLeds(previousMuxValues, midiChannel);
+  updateHallPadStatusLeds(previousMuxValues);
 }
 
 void switchMidiChannel(int direction) {
@@ -692,7 +752,6 @@ uint16_t readPotentiometer(int channel) {
 void setup() {
   Serial.begin(115200);
   initializeStatusLed();
-  runStartupRainbow();
   Serial.println("Initializing Bluetooth...");
   midi.setName("EUCALIPTUS MIDI RED"); ///////////////////////////////////////////////// NAME THE MIDI CONTROLLER
   midi.begin();
