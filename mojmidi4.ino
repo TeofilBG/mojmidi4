@@ -29,6 +29,7 @@ BluetoothMIDI_Interface midi;
 const int numMuxPads = 16;
 const int numPots = 6;
 const int numButtons = 10;
+const int numMidiBanks = 4;
 const int shiftButtonIndex = 5; // Digital button 6 (1-based) on MUX 3
 const int channelSelectButtonIndexes[numMidiBanks] = {3, 4, 6, 7}; // Buttons 4, 5, 7, 8 select channels 1-4 while SHIFT is held
 const int statusLedCount = numMuxPads;
@@ -61,7 +62,6 @@ enum EditTargetType {
   EDIT_TARGET_ENCODER = 3
 };
 
-const int numMidiBanks = 4;
 const int defaultMuxCCVelocity = 127;
 
 // Define the default MIDI values for the multiplexer buttons
