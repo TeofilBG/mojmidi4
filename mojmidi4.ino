@@ -20,32 +20,9 @@ BluetoothMIDI_Interface midi;
 #define MUX_S3 4
 
 // XIAO ESP32S3 Plus MUX COM/SIG pins
-#define MUX1_SIG 7   // 16 active-low Hall-effect pad switches
-#define MUX2_SIG 8   // 6 Potentiometers
-#define MUX3_SIG 9   // 10 Digital buttons
-
-const int numMuxPads = 16;
-const int numPots = 6;
-const int numButtons = 10;
-const int numMidiBanks = 4;
-const int shiftButtonIndex = 5; // Digital button 6 (1-based) on MUX 3
-const int channelSelectButtonIndexes[numMidiBanks] = {3, 4, 6, 7}; // Buttons 4, 5, 7, 8 select channels 1-4 while SHIFT is held
-// Define the MIDI notes for the 10 digital buttons on MUX 3
-const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-
-// Bluetooth MIDI interface provided by the Control Surface library
-BluetoothMIDI_Interface midi;
-
-// XIAO ESP32S3 Plus shared MUX select pins
-#define MUX_S0 1
-#define MUX_S1 2
-#define MUX_S2 3
-#define MUX_S3 4
-
-// XIAO ESP32S3 Plus MUX COM/SIG pins
-#define MUX1_SIG 7   // 16 active-low Hall-effect pad switches
-#define MUX2_SIG 8   // 6 Potentiometers
-#define MUX3_SIG 9   // 10 Digital buttons
+#define MUX1_SIG 7  // 16 active-low Hall-effect pad switches
+#define MUX2_SIG 8  // 6 Potentiometers
+#define MUX3_SIG 9  // 10 Digital buttons
 
 #define STATUS_LED_PIN 43
 
@@ -53,8 +30,8 @@ const int numMuxPads = 16;
 const int numPots = 6;
 const int numButtons = 10;
 const int numMidiBanks = 4;
-const int shiftButtonIndex = 5; // Digital button 6 (1-based) on MUX 3
-const int channelSelectButtonIndexes[numMidiBanks] = {3, 4, 6, 7}; // Buttons 4, 5, 7, 8 select channels 1-4 while SHIFT is held
+const int shiftButtonIndex = 5;                                       // Digital button 6 (1-based) on MUX 3
+const int channelSelectButtonIndexes[numMidiBanks] = { 3, 4, 6, 7 };  // Buttons 4, 5, 7, 8 select channels 1-4 while SHIFT is held
 const int statusLedCount = numMuxPads;
 const uint8_t statusLedPassiveBrightness = 76;
 const uint8_t statusLedActiveBrightness = 255;
@@ -62,45 +39,14 @@ const uint8_t statusLedActiveBrightness = 255;
 CRGB statusLed[statusLedCount];
 
 // Define the MIDI notes for the 10 digital buttons on MUX 3
-const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
-
-// Bluetooth MIDI interface provided by the Control Surface library
-BluetoothMIDI_Interface midi;
-
-// XIAO ESP32S3 Plus shared MUX select pins
-#define MUX_S0 1
-#define MUX_S1 2
-#define MUX_S2 3
-#define MUX_S3 4
-
-// XIAO ESP32S3 Plus MUX COM/SIG pins
-#define MUX1_SIG 7   // 16 active-low Hall-effect pad switches
-#define MUX2_SIG 8   // 6 Potentiometers
-#define MUX3_SIG 9   // 10 Digital buttons
-
-#define STATUS_LED_PIN 43
-
-const int numMuxPads = 16;
-const int numPots = 6;
-const int numButtons = 10;
-const int numMidiBanks = 4;
-const int shiftButtonIndex = 5; // Digital button 6 (1-based) on MUX 3
-const int channelSelectButtonIndexes[numMidiBanks] = {3, 4, 6, 7}; // Buttons 4, 5, 7, 8 select channels 1-4 while SHIFT is held
-const int statusLedCount = numMuxPads;
-const uint8_t statusLedPassiveBrightness = 76;
-const uint8_t statusLedActiveBrightness = 255;
-
-CRGB statusLed[statusLedCount];
-
-// Define the MIDI notes for the 10 digital buttons on MUX 3
-const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+const int midiNotes[numButtons] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
 
 uint16_t previousMuxValues = 0;
 uint16_t previousButtonMuxValues = 0;
-bool digitalButtonNoteActive[numButtons] = {false};
+bool digitalButtonNoteActive[numButtons] = { false };
 
 const int defaultHallPadVelocity = 127;
-int currentMuxPadVelocities[numMuxPads] = {0};
+int currentMuxPadVelocities[numMuxPads] = { 0 };
 
 enum MuxMessageType {
   MUX_MESSAGE_NOTE = 0,
@@ -119,36 +65,36 @@ enum EditTargetType {
 const int defaultMuxCCVelocity = 127;
 
 // Define the default MIDI values for the multiplexer buttons
-const int defaultMuxMidiNotes[numMuxPads] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
+const int defaultMuxMidiNotes[numMuxPads] = { 72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63 };
 int muxMidiNotes[numMidiBanks][numMuxPads] = {
-  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
-  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
-  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
-  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63}
+  { 72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63 },
+  { 72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63 },
+  { 72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63 },
+  { 72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63 }
 };
 int muxMessageTypes[numMidiBanks][numMuxPads] = {
-  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE},
-  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE},
-  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE},
-  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE}
+  { MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE },
+  { MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE },
+  { MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE },
+  { MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
+    MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE }
 };
 int muxCCVelocities[numMidiBanks][numMuxPads] = {
-  {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127},
-  {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127},
-  {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127},
-  {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127}
+  { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 },
+  { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 },
+  { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 },
+  { 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127 }
 };
 
 const int minEditableMidiNote = 21;
@@ -168,15 +114,15 @@ ResponsiveAnalogRead pots[numPots] = {
 };
 
 // Store previous mapped MIDI CC values (0-127) for change detection
-int previousMidiCCValues[numPots] = {-1, -1, -1, -1, -1, -1};
+int previousMidiCCValues[numPots] = { -1, -1, -1, -1, -1, -1 };
 
 // Define default MIDI CC numbers for each potentiometer
-const int defaultMidiCCNumbers[numPots] = {1, 2, 3, 4, 5, 6};
+const int defaultMidiCCNumbers[numPots] = { 1, 2, 3, 4, 5, 6 };
 int midiCCNumbers[numMidiBanks][numPots] = {
-  {1, 2, 3, 4, 5, 6},
-  {1, 2, 3, 4, 5, 6},
-  {1, 2, 3, 4, 5, 6},
-  {1, 2, 3, 4, 5, 6}
+  { 1, 2, 3, 4, 5, 6 },
+  { 1, 2, 3, 4, 5, 6 },
+  { 1, 2, 3, 4, 5, 6 },
+  { 1, 2, 3, 4, 5, 6 }
 };
 
 const int minEditableMidiController = 0;
@@ -185,19 +131,19 @@ const int potSelectThreshold = 64;
 const int potMovingAverageSamples = 8;
 const int potAnalogDeadband = 8;
 const int potMidiDeadband = 1;
-int lastEditPotValues[numPots] = {0, 0, 0, 0, 0, 0};
-uint16_t potMovingAverageReadings[numPots][potMovingAverageSamples] = {0};
-uint32_t potMovingAverageSums[numPots] = {0};
-uint8_t potMovingAverageIndexes[numPots] = {0};
-bool potFiltersInitialized[numPots] = {false};
-uint16_t stablePotValues[numPots] = {0};
+int lastEditPotValues[numPots] = { 0, 0, 0, 0, 0, 0 };
+uint16_t potMovingAverageReadings[numPots][potMovingAverageSamples] = { 0 };
+uint32_t potMovingAverageSums[numPots] = { 0 };
+uint8_t potMovingAverageIndexes[numPots] = { 0 };
+bool potFiltersInitialized[numPots] = { false };
+uint16_t stablePotValues[numPots] = { 0 };
 
-const int defaultEncoderCCNumbers[2] = {10, 11};
+const int defaultEncoderCCNumbers[2] = { 10, 11 };
 int encoderCCNumbers[numMidiBanks][2] = {
-  {10, 11},
-  {10, 11},
-  {10, 11},
-  {10, 11}
+  { 10, 11 },
+  { 10, 11 },
+  { 10, 11 },
+  { 10, 11 }
 };
 
 // Define independent buttons for MIDI channel switching
@@ -232,8 +178,8 @@ int lastEditEncoder2Position = 0;
 AiEsp32RotaryEncoder rotaryEncoder1(ROTARY_ENCODER_A_PIN_1, ROTARY_ENCODER_B_PIN_1, -1, -1, ROTARY_ENCODER_STEPS);
 AiEsp32RotaryEncoder rotaryEncoder2(ROTARY_ENCODER_A_PIN_2, ROTARY_ENCODER_B_PIN_2, -1, -1, ROTARY_ENCODER_STEPS);
 
-int encoder1Values[numMidiBanks] = {64, 64, 64, 64};
-int encoder2Values[numMidiBanks] = {64, 64, 64, 64};
+int encoder1Values[numMidiBanks] = { 64, 64, 64, 64 };
+int encoder2Values[numMidiBanks] = { 64, 64, 64, 64 };
 
 // ISR for rotary encoders
 void IRAM_ATTR readEncoderISR1() {
@@ -476,8 +422,8 @@ void saveMuxMidiNotes() {
       char key[7];
       snprintf(key, sizeof(key), "b%dn%02d", bank, channel);
       midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrain(muxMidiNotes[bank][channel],
-                                                                        valueMinimumForType(muxMessageTypes[bank][channel], EDIT_TARGET_PAD),
-                                                                        valueMaximumForType(muxMessageTypes[bank][channel], EDIT_TARGET_PAD))));
+                                                                       valueMinimumForType(muxMessageTypes[bank][channel], EDIT_TARGET_PAD),
+                                                                       valueMaximumForType(muxMessageTypes[bank][channel], EDIT_TARGET_PAD))));
       snprintf(key, sizeof(key), "b%dt%02d", bank, channel);
       midiNotePreferences.putUChar(key, static_cast<uint8_t>(wrapMuxMessageType(muxMessageTypes[bank][channel])));
       snprintf(key, sizeof(key), "b%dv%02d", bank, channel);
@@ -566,8 +512,10 @@ void selectEncoderForEdit(int encoderChannel) {
   midiNoteMappingsSaved = false;
   printCurrentMidiEditScreen(false);
 #if DEBUG
-  Serial.print("Encoder "); Serial.print(encoderChannel);
-  Serial.print(" current CC "); Serial.println(selectedMidiNote);
+  Serial.print("Encoder ");
+  Serial.print(encoderChannel);
+  Serial.print(" current CC ");
+  Serial.println(selectedMidiNote);
 #endif
 }
 
@@ -581,7 +529,8 @@ void applyMidiChannelChange(int newMidiChannel) {
     previousMidiCCValues[channel] = -1;
   }
 #if DEBUG
-  Serial.print("MIDI channel -> "); Serial.println(midiChannel);
+  Serial.print("MIDI channel -> ");
+  Serial.println(midiChannel);
 #endif
   printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
   updateHallPadStatusLeds(previousMuxValues);
@@ -680,7 +629,7 @@ void handleMidiNoteEditMode() {
   uint16_t currentMuxValues = readMuxButtons();
   for (int channel = 0; channel < numMuxPads; channel++) {
     bool previousState = (previousMuxValues >> channel) & 1;
-    bool currentState  = (currentMuxValues  >> channel) & 1;
+    bool currentState = (currentMuxValues >> channel) & 1;
 
     if (!previousState && currentState) {
       selectedEditTarget = EDIT_TARGET_PAD;
@@ -695,9 +644,12 @@ void handleMidiNoteEditMode() {
       midiNoteMappingsSaved = false;
       printCurrentMidiEditScreen(false);
 #if DEBUG
-      Serial.print("Hall Pad "); Serial.print(channel);
-      Serial.print(" current value "); Serial.print(selectedMidiNote);
-      Serial.print(" type "); Serial.println(muxMessageTypeLabel(selectedMessageType));
+      Serial.print("Hall Pad ");
+      Serial.print(channel);
+      Serial.print(" current value ");
+      Serial.print(selectedMidiNote);
+      Serial.print(" type ");
+      Serial.println(muxMessageTypeLabel(selectedMessageType));
 #endif
     }
   }
@@ -710,7 +662,8 @@ void handleMidiNoteEditMode() {
         midiNoteMappingsSaved = false;
         printCurrentMidiEditScreen(false);
 #if DEBUG
-        Serial.print("Pad CC velocity -> "); Serial.println(selectedMuxCCVelocity);
+        Serial.print("Pad CC velocity -> ");
+        Serial.println(selectedMuxCCVelocity);
 #endif
       } else {
         selectedEditTarget = EDIT_TARGET_POT;
@@ -724,8 +677,10 @@ void handleMidiNoteEditMode() {
         midiNoteMappingsSaved = false;
         printCurrentMidiEditScreen(false);
 #if DEBUG
-        Serial.print("Pot "); Serial.print(channel);
-        Serial.print(" current CC "); Serial.println(selectedMidiNote);
+        Serial.print("Pot ");
+        Serial.print(channel);
+        Serial.print(" current CC ");
+        Serial.println(selectedMidiNote);
 #endif
       }
     }
@@ -784,7 +739,7 @@ void setup() {
   Serial.begin(115200);
   initializeStatusLed();
   Serial.println("Initializing Bluetooth...");
-  midi.setName("EUCALIPTUS MIDI RED"); ///////////////////////////////////////////////// NAME THE MIDI CONTROLLER
+  midi.setName("EUCALIPTUS MIDI RED");  ///////////////////////////////////////////////// NAME THE MIDI CONTROLLER
   midi.begin();
   Serial.println("Waiting for connections...");
 
@@ -822,7 +777,6 @@ void setup() {
 
   rotaryEncoder2.begin();
   rotaryEncoder2.setup(readEncoderISR2);
-  previousMuxValues = readMuxButtons();
   rotaryEncoder2.setBoundaries(0, 127, false);
   rotaryEncoder2.setAcceleration(100);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
@@ -845,7 +799,7 @@ void loop() {
     bool shiftHeld = (currentButtonMuxValues >> shiftButtonIndex) & 1;
     for (int i = 0; i < numButtons; i++) {
       bool previousState = (previousButtonMuxValues >> i) & 1;
-      bool currentState  = (currentButtonMuxValues  >> i) & 1;
+      bool currentState = (currentButtonMuxValues >> i) & 1;
       int selectedChannel = -1;
       for (int channel = 0; channel < numMidiBanks; channel++) {
         if (i == channelSelectButtonIndexes[channel]) {
@@ -861,7 +815,9 @@ void loop() {
           sendMidiMessage(MIDIMessageType::NoteOn, 0, midiNotes[i], 127);
           digitalButtonNoteActive[i] = true;
 #if DEBUG
-          Serial.print("Direct MUX Button "); Serial.print(i); Serial.println(" pressed");
+          Serial.print("Direct MUX Button ");
+          Serial.print(i);
+          Serial.println(" pressed");
 #endif
         }
       } else if (previousState && !currentState) {
@@ -878,7 +834,7 @@ void loop() {
 
     for (int channel = 0; channel < numMuxPads; channel++) {
       bool previousState = (previousMuxValues >> channel) & 1;
-      bool currentState  = (currentMuxValues  >> channel) & 1;
+      bool currentState = (currentMuxValues >> channel) & 1;
 
       int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
       int muxValue = constrain(muxMidiNotes[midiChannel][channel],
@@ -895,8 +851,10 @@ void loop() {
           sendMidiMessage(MIDIMessageType::ProgramChange, midiChannel, muxValue, 0);
         }
 #if DEBUG
-        Serial.print("Hall Pad "); Serial.print(channel);
-        Serial.print(" pressed on MIDI channel "); Serial.println(midiChannel);
+        Serial.print("Hall Pad ");
+        Serial.print(channel);
+        Serial.print(" pressed on MIDI channel ");
+        Serial.println(midiChannel);
 #endif
       } else if (previousState && !currentState) {
         if (muxType == MUX_MESSAGE_NOTE) {
@@ -919,10 +877,14 @@ void loop() {
         sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, midiCCNumbers[midiChannel][channel], midiCCValue);
         previousMidiCCValues[channel] = midiCCValue;
 #if DEBUG
-        Serial.print("Pot "); Serial.print(channel);
-        Serial.print(" -> CC "); Serial.print(midiCCNumbers[midiChannel][channel]);
-        Serial.print(" val "); Serial.print(midiCCValue);
-        Serial.print(" ch "); Serial.println(midiChannel);
+        Serial.print("Pot ");
+        Serial.print(channel);
+        Serial.print(" -> CC ");
+        Serial.print(midiCCNumbers[midiChannel][channel]);
+        Serial.print(" val ");
+        Serial.print(midiCCValue);
+        Serial.print(" ch ");
+        Serial.println(midiChannel);
 #endif
       }
     }
@@ -935,8 +897,12 @@ void loop() {
       sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, encoderCCNumbers[midiChannel][0], encoder1Position);
       encoder1Values[midiChannel] = encoder1Position;
 #if DEBUG
-      Serial.print("Enc1: "); Serial.print(encoder1Position);
-      Serial.print(" -> CC "); Serial.print(encoderCCNumbers[midiChannel][0]); Serial.print(" ch "); Serial.println(midiChannel);
+      Serial.print("Enc1: ");
+      Serial.print(encoder1Position);
+      Serial.print(" -> CC ");
+      Serial.print(encoderCCNumbers[midiChannel][0]);
+      Serial.print(" ch ");
+      Serial.println(midiChannel);
 #endif
       printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
     }
@@ -945,8 +911,12 @@ void loop() {
       sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, encoderCCNumbers[midiChannel][1], encoder2Position);
       encoder2Values[midiChannel] = encoder2Position;
 #if DEBUG
-      Serial.print("Enc2: "); Serial.print(encoder2Position);
-      Serial.print(" -> CC "); Serial.print(encoderCCNumbers[midiChannel][1]); Serial.print(" ch "); Serial.println(midiChannel);
+      Serial.print("Enc2: ");
+      Serial.print(encoder2Position);
+      Serial.print(" -> CC ");
+      Serial.print(encoderCCNumbers[midiChannel][1]);
+      Serial.print(" ch ");
+      Serial.println(midiChannel);
 #endif
       printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
     }
