@@ -78,3 +78,7 @@ mojmidi4_1.ino.bak
 ```
 
 After removing the duplicate tab/file, compile `mojmidi4.ino` again.
+
+### `undefined reference to setup()` / `undefined reference to loop()`
+
+If the Arduino linker reports `undefined reference to setup()` or `undefined reference to loop()`, it usually means the IDE did not compile the sketch tab that contains the real firmware entry points. Keep `mojmidi4.ino` directly inside a sketch folder named `mojmidi4`, open that file/folder in Arduino IDE, and avoid empty duplicate `.ino` files in the same folder. The sketch also defines small `setup()` and `loop()` wrappers near the top of `mojmidi4.ino` so the Arduino build sees the entry points before the larger firmware implementation.
