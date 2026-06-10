@@ -28,6 +28,13 @@ This sketch is configured for the XIAO ESP32S3 Plus pinout:
 - Hall pads are scanned on all 16 MUX1 channels with `digitalRead(MUX1_SIG) == LOW`, using a 10 microsecond settle time after each mux channel change.
 - MUX2 potentiometers are reversed so clockwise/upward travel increases MIDI CC values, with 8-sample moving average smoothing, deadband jitter suppression, and raw readings below 3 forced immediately to 0 by resetting the smoothing filter.
 
+## Channel selection
+
+Encoder button single-clicks no longer change MIDI channels during normal play.
+Hold digital button 7 as SHIFT and press digital buttons 3, 4, 5, or 6 to select
+MIDI channels 1, 2, 3, or 4. Without SHIFT held, the digital buttons keep their
+normal MIDI note behavior. Encoder long-press/menu behavior is unchanged.
+
 ## MIDI note edit mode
 
 Long-press encoder button 2 to enter or exit MIDI note edit mode. In this mode,

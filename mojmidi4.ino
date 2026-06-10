@@ -29,6 +29,8 @@ BluetoothMIDI_Interface midi;
 const int numMuxPads = 16;
 const int numPots = 6;
 const int numButtons = 10;
+const int shiftButtonIndex = 6; // Digital button 7 (1-based) on MUX 3
+const int channelSelectButtonStartIndex = 2; // Digital buttons 3-6 (1-based) select channels 1-4 while SHIFT is held
 const int statusLedCount = numMuxPads;
 const uint8_t statusLedPassiveBrightness = 76;
 const uint8_t statusLedActiveBrightness = 255;
@@ -40,6 +42,7 @@ const int midiNotes[numButtons] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
 
 uint16_t previousMuxValues = 0;
 uint16_t previousButtonMuxValues = 0;
+bool digitalButtonNoteActive[numButtons] = {false};
 
 const int defaultHallPadVelocity = 127;
 int currentMuxPadVelocities[numMuxPads] = {0};
@@ -514,10 +517,10 @@ void selectEncoderForEdit(int encoderChannel) {
 #endif
 }
 
-void switchMidiChannel(int direction) {
+void applyMidiChannelChange(int newMidiChannel) {
   encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
   encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
-  midiChannel = (midiChannel + direction + numMidiBanks) % numMidiBanks;
+  midiChannel = (newMidiChannel + numMidiBanks) % numMidiBanks;
   rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
   rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
   for (int channel = 0; channel < numPots; channel++) {
@@ -530,19 +533,24 @@ void switchMidiChannel(int direction) {
   updateHallPadStatusLeds(previousMuxValues);
 }
 
+void switchMidiChannel(int direction) {
+  applyMidiChannelChange(midiChannel + direction);
+}
+
+void selectMidiChannel(int newMidiChannel) {
+  if (newMidiChannel == midiChannel) return;
+  applyMidiChannelChange(newMidiChannel);
+}
+
 void handleEncoderButton1Click() {
   if (midiNoteEditMode) {
     selectEncoderForEdit(0);
-  } else {
-    switchMidiChannel(1);
   }
 }
 
 void handleEncoderButton2Click() {
   if (midiNoteEditMode) {
     selectEncoderForEdit(1);
-  } else {
-    switchMidiChannel(-1);
   }
 }
 
@@ -780,17 +788,27 @@ void loop() {
   } else if (midi.isConnected()) {
     // --- Digital buttons on MUX 3 ---
     uint16_t currentButtonMuxValues = readDirectButtons();
+    bool shiftHeld = (currentButtonMuxValues >> shiftButtonIndex) & 1;
     for (int i = 0; i < numButtons; i++) {
       bool previousState = (previousButtonMuxValues >> i) & 1;
       bool currentState  = (currentButtonMuxValues  >> i) & 1;
+      bool isChannelSelectButton = i >= channelSelectButtonStartIndex && i < channelSelectButtonStartIndex + numMidiBanks;
 
       if (!previousState && currentState) {
-        sendMidiMessage(MIDIMessageType::NoteOn, 0, midiNotes[i], 127);
+        if (shiftHeld && isChannelSelectButton) {
+          selectMidiChannel(i - channelSelectButtonStartIndex);
+        } else if (i != shiftButtonIndex) {
+          sendMidiMessage(MIDIMessageType::NoteOn, 0, midiNotes[i], 127);
+          digitalButtonNoteActive[i] = true;
 #if DEBUG
-        Serial.print("Direct MUX Button "); Serial.print(i); Serial.println(" pressed");
+          Serial.print("Direct MUX Button "); Serial.print(i); Serial.println(" pressed");
 #endif
+        }
       } else if (previousState && !currentState) {
-        sendMidiMessage(MIDIMessageType::NoteOff, 0, midiNotes[i], 127);
+        if (digitalButtonNoteActive[i]) {
+          sendMidiMessage(MIDIMessageType::NoteOff, 0, midiNotes[i], 127);
+          digitalButtonNoteActive[i] = false;
+        }
       }
     }
     previousButtonMuxValues = currentButtonMuxValues;
