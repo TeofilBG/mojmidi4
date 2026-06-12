@@ -66,36 +66,10 @@ const int defaultMuxCCVelocity = 127;
 
 // Define the default MIDI values for the multiplexer buttons
 const int defaultMuxMidiNotes[numMuxPads] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
-int muxMidiNotes[numMidiBanks][numMuxPads] = {
-  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
-  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
-  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63},
-  {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63}
-};
-int muxMessageTypes[numMidiBanks][numMuxPads] = {
-  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE},
-  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE},
-  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE},
-  {MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE,
-   MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE, MUX_MESSAGE_NOTE}
-};
-int muxCCVelocities[numMidiBanks][numMuxPads] = {
-  {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127},
-  {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127},
-  {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127},
-  {127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127, 127}
-};
+// Per-bank pad mappings are loaded from Preferences in loadMuxMidiNotes().
+int muxMidiNotes[numMidiBanks][numMuxPads];
+int muxMessageTypes[numMidiBanks][numMuxPads];
+int muxCCVelocities[numMidiBanks][numMuxPads];
 
 const int minEditableMidiNote = 21;
 const int maxEditableMidiNote = 108;
@@ -118,12 +92,8 @@ int previousMidiCCValues[numPots] = {-1, -1, -1, -1, -1, -1};
 
 // Define default MIDI CC numbers for each potentiometer
 const int defaultMidiCCNumbers[numPots] = {1, 2, 3, 4, 5, 6};
-int midiCCNumbers[numMidiBanks][numPots] = {
-  {1, 2, 3, 4, 5, 6},
-  {1, 2, 3, 4, 5, 6},
-  {1, 2, 3, 4, 5, 6},
-  {1, 2, 3, 4, 5, 6}
-};
+// Per-bank pot CC mappings are loaded from Preferences in loadMuxMidiNotes().
+int midiCCNumbers[numMidiBanks][numPots];
 
 const int minEditableMidiController = 0;
 const int maxEditableMidiController = 127;
@@ -140,12 +110,8 @@ bool potFiltersInitialized[numPots] = {false};
 uint16_t stablePotValues[numPots] = {0};
 
 const int defaultEncoderCCNumbers[2] = {10, 11};
-int encoderCCNumbers[numMidiBanks][2] = {
-  {10, 11},
-  {10, 11},
-  {10, 11},
-  {10, 11}
-};
+// Per-bank encoder CC mappings are loaded from Preferences in loadMuxMidiNotes().
+int encoderCCNumbers[numMidiBanks][2];
 
 // Define independent buttons for MIDI channel switching
 const int channelButton1 = 41;
@@ -847,6 +813,12 @@ void loop() {
     for (int channel = 0; channel < numMuxPads; channel++) {
       bool previousState = (previousMuxValues >> channel) & 1;
       bool currentState = (currentMuxValues >> channel) & 1;
+
+      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
+      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
+                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
+                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
+      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
 
       int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
       int muxValue = constrain(muxMidiNotes[midiChannel][channel],
