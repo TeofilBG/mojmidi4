@@ -227,6 +227,23 @@ void updateHallPadStatusLeds(uint16_t hallPadStates) {
   FastLED.show();
 }
 
+void sendMuxPadPressMessage(int muxType, int muxValue, int velocity) {
+  if (muxType == MUX_MESSAGE_NOTE) {
+    sendMidiMessage(MIDIMessageType::NoteOn, midiChannel, muxValue, velocity);
+  } else if (muxType == MUX_MESSAGE_CONTROL_CHANGE) {
+    sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, muxValue, velocity);
+  } else if (muxType == MUX_MESSAGE_PROGRAM_CHANGE) {
+    sendMidiMessage(MIDIMessageType::ProgramChange, midiChannel, muxValue, 0);
+  }
+}
+
+void sendMuxPadReleaseMessage(int muxType, int muxValue) {
+  if (muxType == MUX_MESSAGE_NOTE) {
+    sendMidiMessage(MIDIMessageType::NoteOff, midiChannel, muxValue, 127);
+  } else if (muxType == MUX_MESSAGE_CONTROL_CHANGE) {
+    sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, muxValue, 0);
+  }
+}
 
 const char *muxMessageTypeLabel(int messageType) {
   switch (messageType) {
@@ -837,24 +854,21 @@ void loop() {
                                valueMaximumForType(muxType, EDIT_TARGET_PAD));
       int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
 
+      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
+      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
+                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
+                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
+      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
+
       if (!previousState && currentState) {
-        if (muxType == MUX_MESSAGE_NOTE) {
-          sendMidiMessage(MIDIMessageType::NoteOn, midiChannel, muxValue, currentMuxPadVelocities[channel]);
-        } else if (muxType == MUX_MESSAGE_CONTROL_CHANGE) {
-          sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, muxValue, muxCCVelocity);
-        } else if (muxType == MUX_MESSAGE_PROGRAM_CHANGE) {
-          sendMidiMessage(MIDIMessageType::ProgramChange, midiChannel, muxValue, 0);
-        }
+        int pressVelocity = (muxType == MUX_MESSAGE_CONTROL_CHANGE) ? muxCCVelocity : currentMuxPadVelocities[channel];
+        sendMuxPadPressMessage(muxType, muxValue, pressVelocity);
 #if DEBUG
         Serial.print("Hall Pad "); Serial.print(channel);
         Serial.print(" pressed on MIDI channel "); Serial.println(midiChannel);
 #endif
       } else if (previousState && !currentState) {
-        if (muxType == MUX_MESSAGE_NOTE) {
-          sendMidiMessage(MIDIMessageType::NoteOff, midiChannel, muxValue, 127);
-        } else if (muxType == MUX_MESSAGE_CONTROL_CHANGE) {
-          sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, muxValue, 0);
-        }
+        sendMuxPadReleaseMessage(muxType, muxValue);
       }
     }
     previousMuxValues = currentMuxValues;
