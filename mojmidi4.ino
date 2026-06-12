@@ -128,6 +128,7 @@ int midiCCNumbers[numMidiBanks][numPots] = {
 const int minEditableMidiController = 0;
 const int maxEditableMidiController = 127;
 const int potSelectThreshold = 64;
+const int padCCVelocityPotChannel = 1; // Potentiometer 2 adjusts selected pad CC velocity/value.
 const int potMovingAverageSamples = 8;
 const int potAnalogDeadband = 8;
 const int potMidiDeadband = 1;
@@ -667,30 +668,35 @@ void handleMidiNoteEditMode() {
 
   for (int channel = 0; channel < numPots; channel++) {
     int currentPotValue = readPotentiometer(channel);
-    if (abs(currentPotValue - lastEditPotValues[channel]) >= potSelectThreshold) {
-      if (selectedEditTarget == EDIT_TARGET_PAD && selectedMessageType == MUX_MESSAGE_CONTROL_CHANGE && channel == 1) {
-        selectedMuxCCVelocity = midiDataValueFromPot(currentPotValue);
+    bool editingPadCCVelocity = selectedEditTarget == EDIT_TARGET_PAD &&
+                                selectedMessageType == MUX_MESSAGE_CONTROL_CHANGE &&
+                                channel == padCCVelocityPotChannel;
+
+    if (editingPadCCVelocity) {
+      int currentVelocity = midiDataValueFromPot(currentPotValue);
+      if (currentVelocity != selectedMuxCCVelocity) {
+        selectedMuxCCVelocity = currentVelocity;
         midiNoteMappingsSaved = false;
         printCurrentMidiEditScreen(false);
 #if DEBUG
         Serial.print("Pad CC velocity -> "); Serial.println(selectedMuxCCVelocity);
 #endif
-      } else {
-        selectedEditTarget = EDIT_TARGET_POT;
-        editedPotChannel = channel;
-        editedMuxChannel = -1;
-        editedEncoderChannel = -1;
-        selectedMessageType = MUX_MESSAGE_CONTROL_CHANGE;
-        selectedMidiNote = constrain(midiCCNumbers[midiChannel][channel], minEditableMidiController, maxEditableMidiController);
-        lastEditEncoder1Position = rotaryEncoder1.readEncoder();
-        lastEditEncoder2Position = rotaryEncoder2.readEncoder();
-        midiNoteMappingsSaved = false;
-        printCurrentMidiEditScreen(false);
-#if DEBUG
-        Serial.print("Pot "); Serial.print(channel);
-        Serial.print(" current CC "); Serial.println(selectedMidiNote);
-#endif
       }
+    } else if (abs(currentPotValue - lastEditPotValues[channel]) >= potSelectThreshold) {
+      selectedEditTarget = EDIT_TARGET_POT;
+      editedPotChannel = channel;
+      editedMuxChannel = -1;
+      editedEncoderChannel = -1;
+      selectedMessageType = MUX_MESSAGE_CONTROL_CHANGE;
+      selectedMidiNote = constrain(midiCCNumbers[midiChannel][channel], minEditableMidiController, maxEditableMidiController);
+      lastEditEncoder1Position = rotaryEncoder1.readEncoder();
+      lastEditEncoder2Position = rotaryEncoder2.readEncoder();
+      midiNoteMappingsSaved = false;
+      printCurrentMidiEditScreen(false);
+#if DEBUG
+      Serial.print("Pot "); Serial.print(channel);
+      Serial.print(" current CC "); Serial.println(selectedMidiNote);
+#endif
     }
     lastEditPotValues[channel] = currentPotValue;
   }
@@ -841,6 +847,12 @@ void loop() {
     for (int channel = 0; channel < numMuxPads; channel++) {
       bool previousState = (previousMuxValues >> channel) & 1;
       bool currentState = (currentMuxValues >> channel) & 1;
+
+      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
+      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
+                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
+                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
+      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
 
       int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
       int muxValue = constrain(muxMidiNotes[midiChannel][channel],
