@@ -812,7 +812,31 @@ void loop() {
 
     for (int channel = 0; channel < numMuxPads; channel++) {
       bool previousState = (previousMuxValues >> channel) & 1;
-      bool currentState  = (currentMuxValues  >> channel) & 1;
+      bool currentState = (currentMuxValues >> channel) & 1;
+
+      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
+      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
+                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
+                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
+      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
+
+      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
+      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
+                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
+                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
+      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
+
+      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
+      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
+                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
+                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
+      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
+
+      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
+      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
+                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
+                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
+      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
 
       int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
       int muxValue = constrain(muxMidiNotes[midiChannel][channel],
