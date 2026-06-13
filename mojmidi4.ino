@@ -154,13 +154,21 @@ int encoder2Values[numMidiBanks] = {64, 64, 64, 64};
 
 const int scaleMidiChannel = 3; // Channel 4 (zero-based channel 3) is the scale-performance channel.
 const int scaleRootMinimum = 0;
-const int scaleRootMaximum = 101; // Keeps the highest 16-pad scale note inside MIDI range.
-const int scaleCount = 3;
-const char *scaleNames[scaleCount] = {"Chro", "Maj", "Min"};
+const int scaleRootMaximum = 91; // Keeps the highest 16-pad scale note inside MIDI range.
+const int scaleCount = 11;
+const char *scaleNames[scaleCount] = {"Chro", "Maj", "Min", "H.Min", "MajPent", "Hexa", "WholeTone", "Dim", "Jap", "Pelog", "YingZ"};
 const int scaleIntervals[scaleCount][numMuxPads] = {
   {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
   {0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24, 26},
-  {0, 2, 3, 5, 7, 8, 10, 12, 14, 15, 17, 19, 20, 22, 24, 26}
+  {0, 2, 3, 5, 7, 8, 10, 12, 14, 15, 17, 19, 20, 22, 24, 26},
+  {0, 2, 3, 5, 7, 8, 11, 12, 14, 15, 17, 19, 20, 23, 24, 26},
+  {0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36},
+  {0, 2, 4, 5, 7, 9, 12, 14, 16, 17, 19, 21, 24, 26, 28, 29},
+  {0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24, 26, 28, 30},
+  {0, 1, 3, 4, 6, 7, 9, 10, 12, 13, 15, 16, 18, 19, 21, 22},
+  {0, 1, 5, 7, 10, 12, 13, 17, 19, 22, 24, 25, 29, 31, 34, 36},
+  {0, 1, 3, 7, 8, 12, 13, 15, 19, 20, 24, 25, 27, 31, 32, 36},
+  {0, 2, 4, 7, 9, 12, 14, 16, 19, 21, 24, 26, 28, 31, 33, 36}
 };
 int scaleRootNote = 60;
 int selectedScale = 0;
@@ -898,43 +906,6 @@ void loop() {
     for (int channel = 0; channel < numMuxPads; channel++) {
       bool previousState = (previousMuxValues >> channel) & 1;
       bool currentState = (currentMuxValues >> channel) & 1;
-
-      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
-      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
-                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
-                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
-      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
-
-      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
-      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
-                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
-                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
-      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
-
-      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
-      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
-                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
-                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
-      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
-
-      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
-      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
-                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
-                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
-      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
-
-      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
-      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
-                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
-                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
-      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
-
-      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
-      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
-                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
-                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
-      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
-      int muxCCReleaseValue = constrainMidiDataValue(muxCCReleaseValues[midiChannel][channel]);
 
       if (isScalePerformanceChannel()) {
         if (!previousState && currentState) {

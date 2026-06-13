@@ -41,7 +41,8 @@ normal MIDI note behavior. Encoder long-press/menu behavior is unchanged.
 MIDI channel 4 is a scale-performance channel for the 16 Hall pads. Pads ignore
 the editable pad mapping on this channel and play a scale beginning at the
 selected root note, defaulting to MIDI note `60`. Encoder 1 changes the root
-note, and encoder 2 chooses `Chro`, `Maj`, or `Min`.
+note, and encoder 2 chooses `Chro`, `Maj`, `Min`, `H.Min`, `MajPent`, `Hexa`,
+`WholeTone`, `Dim`, `Jap`, `Pelog`, or `YingZ`.
 
 ## MIDI note edit mode
 
