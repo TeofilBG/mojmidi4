@@ -905,7 +905,7 @@ void loop() {
 
     for (int channel = 0; channel < numMuxPads; channel++) {
       bool previousState = (previousMuxValues >> channel) & 1;
-      bool currentState  = (currentMuxValues  >> channel) & 1;
+      bool currentState = (currentMuxValues >> channel) & 1;
 
       if (isScalePerformanceChannel()) {
         if (!previousState && currentState) {
