@@ -152,6 +152,20 @@ AiEsp32RotaryEncoder rotaryEncoder2(ROTARY_ENCODER_A_PIN_2, ROTARY_ENCODER_B_PIN
 int encoder1Values[numMidiBanks] = {64, 64, 64, 64};
 int encoder2Values[numMidiBanks] = {64, 64, 64, 64};
 
+const int scaleMidiChannel = 3; // Channel 4 (zero-based channel 3) is the scale-performance channel.
+const int scaleRootMinimum = 0;
+const int scaleRootMaximum = 101; // Keeps the highest 16-pad scale note inside MIDI range.
+const int scaleCount = 3;
+const char *scaleNames[scaleCount] = {"Chro", "Maj", "Min"};
+const int scaleIntervals[scaleCount][numMuxPads] = {
+  {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+  {0, 2, 4, 5, 7, 9, 11, 12, 14, 16, 17, 19, 21, 23, 24, 26},
+  {0, 2, 3, 5, 7, 8, 10, 12, 14, 15, 17, 19, 20, 22, 24, 26}
+};
+int scaleRootNote = 60;
+int selectedScale = 0;
+int activeScalePadNotes[numMuxPads] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+
 // ISR for rotary encoders
 void IRAM_ATTR readEncoderISR1() {
   rotaryEncoder1.readEncoder_ISR();
@@ -280,6 +294,28 @@ int currentEncoderCCNumber(int encoderChannel) {
   return constrain(encoderCCNumbers[currentMidiBank()][safeEncoderChannel],
                    minEditableMidiController,
                    maxEditableMidiController);
+}
+
+bool isScalePerformanceChannel() {
+  return midiChannel == scaleMidiChannel;
+}
+
+const char *currentScaleName() {
+  return scaleNames[constrain(selectedScale, 0, scaleCount - 1)];
+}
+
+int scaleNoteForPad(int padChannel) {
+  int safePadChannel = constrain(padChannel, 0, numMuxPads - 1);
+  int safeScale = constrain(selectedScale, 0, scaleCount - 1);
+  return constrain(scaleRootNote + scaleIntervals[safeScale][safePadChannel], 0, 127);
+}
+
+void printCurrentPerformanceScreen() {
+  if (isScalePerformanceChannel()) {
+    printScaleChannelScreen(scaleRootNote, currentScaleName());
+  } else {
+    printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
+  }
 }
 
 const char *currentEditTypeLabel() {
@@ -478,9 +514,18 @@ void exitMidiNoteEditMode() {
   midiNoteEditMode = false;
   selectedEditTarget = EDIT_TARGET_NONE;
   previousMuxValues = readMuxButtons();
-  rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
-  rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
-  printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
+  if (isScalePerformanceChannel()) {
+    rotaryEncoder1.setBoundaries(scaleRootMinimum, scaleRootMaximum, false);
+    rotaryEncoder2.setBoundaries(0, scaleCount - 1, false);
+    rotaryEncoder1.setEncoderValue(scaleRootNote);
+    rotaryEncoder2.setEncoderValue(selectedScale);
+  } else {
+    rotaryEncoder1.setBoundaries(0, 127, false);
+    rotaryEncoder2.setBoundaries(0, 127, false);
+    rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
+    rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
+  }
+  printCurrentPerformanceScreen();
 #if DEBUG
   Serial.println("MIDI note edit mode exited");
 #endif
@@ -512,18 +557,34 @@ void selectEncoderForEdit(int encoderChannel) {
 }
 
 void applyMidiChannelChange(int newMidiChannel) {
-  encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
-  encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
+  if (isScalePerformanceChannel()) {
+    scaleRootNote = constrain(rotaryEncoder1.readEncoder(), scaleRootMinimum, scaleRootMaximum);
+    selectedScale = constrain(rotaryEncoder2.readEncoder(), 0, scaleCount - 1);
+  } else {
+    encoder1Values[midiChannel] = rotaryEncoder1.readEncoder();
+    encoder2Values[midiChannel] = rotaryEncoder2.readEncoder();
+  }
+
   midiChannel = (newMidiChannel + numMidiBanks) % numMidiBanks;
-  rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
-  rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
+  if (isScalePerformanceChannel()) {
+    rotaryEncoder1.setBoundaries(scaleRootMinimum, scaleRootMaximum, false);
+    rotaryEncoder2.setBoundaries(0, scaleCount - 1, false);
+    rotaryEncoder1.setEncoderValue(scaleRootNote);
+    rotaryEncoder2.setEncoderValue(selectedScale);
+  } else {
+    rotaryEncoder1.setBoundaries(0, 127, false);
+    rotaryEncoder2.setBoundaries(0, 127, false);
+    rotaryEncoder1.setEncoderValue(encoder1Values[midiChannel]);
+    rotaryEncoder2.setEncoderValue(encoder2Values[midiChannel]);
+  }
+
   for (int channel = 0; channel < numPots; channel++) {
     previousMidiCCValues[channel] = -1;
   }
 #if DEBUG
   Serial.print("MIDI channel -> "); Serial.println(midiChannel);
 #endif
-  printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
+  printCurrentPerformanceScreen();
   updateHallPadStatusLeds(previousMuxValues);
 }
 
@@ -788,7 +849,7 @@ void setup() {
   previousButtonMuxValues = readDirectButtons();
 
   initializeDisplay();
-  printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
+  printCurrentPerformanceScreen();
 }
 
 void loop() {
@@ -875,15 +936,39 @@ void loop() {
       int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
       int muxCCReleaseValue = constrainMidiDataValue(muxCCReleaseValues[midiChannel][channel]);
 
-      if (!previousState && currentState) {
-        int pressVelocity = (muxType == MUX_MESSAGE_CONTROL_CHANGE) ? muxCCVelocity : currentMuxPadVelocities[channel];
-        sendMuxPadPressMessage(muxType, muxValue, pressVelocity);
+      if (isScalePerformanceChannel()) {
+        if (!previousState && currentState) {
+          int scaleNote = scaleNoteForPad(channel);
+          activeScalePadNotes[channel] = scaleNote;
+          sendMidiMessage(MIDIMessageType::NoteOn, midiChannel, scaleNote, currentMuxPadVelocities[channel]);
 #if DEBUG
-        Serial.print("Hall Pad "); Serial.print(channel);
-        Serial.print(" pressed on MIDI channel "); Serial.println(midiChannel);
+          Serial.print("Scale Pad "); Serial.print(channel);
+          Serial.print(" note "); Serial.print(scaleNote);
+          Serial.print(" scale "); Serial.println(currentScaleName());
 #endif
-      } else if (previousState && !currentState) {
-        sendMuxPadReleaseMessage(muxType, muxValue, muxCCReleaseValue);
+        } else if (previousState && !currentState) {
+          int scaleNote = activeScalePadNotes[channel] >= 0 ? activeScalePadNotes[channel] : scaleNoteForPad(channel);
+          sendMidiMessage(MIDIMessageType::NoteOff, midiChannel, scaleNote, 127);
+          activeScalePadNotes[channel] = -1;
+        }
+      } else {
+        int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
+        int muxValue = constrain(muxMidiNotes[midiChannel][channel],
+                                 valueMinimumForType(muxType, EDIT_TARGET_PAD),
+                                 valueMaximumForType(muxType, EDIT_TARGET_PAD));
+        int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
+        int muxCCReleaseValue = constrainMidiDataValue(muxCCReleaseValues[midiChannel][channel]);
+
+        if (!previousState && currentState) {
+          int pressVelocity = (muxType == MUX_MESSAGE_CONTROL_CHANGE) ? muxCCVelocity : currentMuxPadVelocities[channel];
+          sendMuxPadPressMessage(muxType, muxValue, pressVelocity);
+#if DEBUG
+          Serial.print("Hall Pad "); Serial.print(channel);
+          Serial.print(" pressed on MIDI channel "); Serial.println(midiChannel);
+#endif
+        } else if (previousState && !currentState) {
+          sendMuxPadReleaseMessage(muxType, muxValue, muxCCReleaseValue);
+        }
       }
     }
     previousMuxValues = currentMuxValues;
@@ -911,24 +996,38 @@ void loop() {
     int encoder1Position = rotaryEncoder1.readEncoder();
     int encoder2Position = rotaryEncoder2.readEncoder();
 
-    if (encoder1Position != encoder1Values[midiChannel]) {
-      sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, encoderCCNumbers[midiChannel][0], encoder1Position);
-      encoder1Values[midiChannel] = encoder1Position;
+    if (isScalePerformanceChannel()) {
+      int newRootNote = constrain(encoder1Position, scaleRootMinimum, scaleRootMaximum);
+      int newScale = constrain(encoder2Position, 0, scaleCount - 1);
+      if (newRootNote != scaleRootNote || newScale != selectedScale) {
+        scaleRootNote = newRootNote;
+        selectedScale = newScale;
 #if DEBUG
-      Serial.print("Enc1: "); Serial.print(encoder1Position);
-      Serial.print(" -> CC "); Serial.print(encoderCCNumbers[midiChannel][0]); Serial.print(" ch "); Serial.println(midiChannel);
+        Serial.print("Scale root "); Serial.print(scaleRootNote);
+        Serial.print(" scale "); Serial.println(currentScaleName());
 #endif
-      printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
-    }
+        printCurrentPerformanceScreen();
+      }
+    } else {
+      if (encoder1Position != encoder1Values[midiChannel]) {
+        sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, encoderCCNumbers[midiChannel][0], encoder1Position);
+        encoder1Values[midiChannel] = encoder1Position;
+#if DEBUG
+        Serial.print("Enc1: "); Serial.print(encoder1Position);
+        Serial.print(" -> CC "); Serial.print(encoderCCNumbers[midiChannel][0]); Serial.print(" ch "); Serial.println(midiChannel);
+#endif
+        printCurrentPerformanceScreen();
+      }
 
-    if (encoder2Position != encoder2Values[midiChannel]) {
-      sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, encoderCCNumbers[midiChannel][1], encoder2Position);
-      encoder2Values[midiChannel] = encoder2Position;
+      if (encoder2Position != encoder2Values[midiChannel]) {
+        sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, encoderCCNumbers[midiChannel][1], encoder2Position);
+        encoder2Values[midiChannel] = encoder2Position;
 #if DEBUG
-      Serial.print("Enc2: "); Serial.print(encoder2Position);
-      Serial.print(" -> CC "); Serial.print(encoderCCNumbers[midiChannel][1]); Serial.print(" ch "); Serial.println(midiChannel);
+        Serial.print("Enc2: "); Serial.print(encoder2Position);
+        Serial.print(" -> CC "); Serial.print(encoderCCNumbers[midiChannel][1]); Serial.print(" ch "); Serial.println(midiChannel);
 #endif
-      printChannelAndEncoders(midiChannel + 1, encoder1Values[midiChannel], encoder2Values[midiChannel]);
+        printCurrentPerformanceScreen();
+      }
     }
   }
 

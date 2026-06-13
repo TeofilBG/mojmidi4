@@ -35,6 +35,14 @@ Hold digital button 6 as SHIFT and press digital buttons 4, 5, 7, or 8 to select
 MIDI channels 1, 2, 3, or 4. Without SHIFT held, the digital buttons keep their
 normal MIDI note behavior. Encoder long-press/menu behavior is unchanged.
 
+
+## Channel 4 scale performance mode
+
+MIDI channel 4 is a scale-performance channel for the 16 Hall pads. Pads ignore
+the editable pad mapping on this channel and play a scale beginning at the
+selected root note, defaulting to MIDI note `60`. Encoder 1 changes the root
+note, and encoder 2 chooses `Chro`, `Maj`, or `Min`.
+
 ## MIDI note edit mode
 
 Long-press encoder button 2 to enter or exit MIDI note edit mode. In this mode,

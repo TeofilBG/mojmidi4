@@ -42,6 +42,22 @@ inline void printChannelAndEncoders(int channel, int enc1Value, int enc2Value) {
   Graphics::drawStatusScreen(display, channelText, enc1Text, enc2Text);
 }
 
+
+inline void printScaleChannelScreen(int rootNote, const char *scaleName) {
+  lastDisplayChannel = 4;
+  lastDisplayEnc1 = rootNote;
+  lastDisplayEnc2 = -2;
+
+  char channelText[6];
+  char rootText[13];
+  char scaleText[13];
+  snprintf(channelText, sizeof(channelText), "CH:04");
+  snprintf(rootText, sizeof(rootText), "ROOT:%d", rootNote);
+  snprintf(scaleText, sizeof(scaleText), "%s", scaleName);
+
+  Graphics::drawStatusScreen(display, channelText, rootText, scaleText);
+}
+
 inline void printMidiNoteEditScreen(int noteValue, const char *messageTypeText, const char *targetText, bool saved) {
   lastDisplayChannel = -1;
   lastDisplayEnc1 = -1;
