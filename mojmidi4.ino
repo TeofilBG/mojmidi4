@@ -63,6 +63,7 @@ enum EditTargetType {
 };
 
 const int defaultMuxCCVelocity = 127;
+const int defaultMuxCCReleaseValue = 0;
 
 // Define the default MIDI values for the multiplexer buttons
 const int defaultMuxMidiNotes[numMuxPads] = {72, 73, 74, 75, 68, 69, 70, 71, 64, 65, 66, 67, 60, 61, 62, 63};
@@ -70,6 +71,7 @@ const int defaultMuxMidiNotes[numMuxPads] = {72, 73, 74, 75, 68, 69, 70, 71, 64,
 int muxMidiNotes[numMidiBanks][numMuxPads];
 int muxMessageTypes[numMidiBanks][numMuxPads];
 int muxCCVelocities[numMidiBanks][numMuxPads];
+int muxCCReleaseValues[numMidiBanks][numMuxPads];
 
 const int minEditableMidiNote = 21;
 const int maxEditableMidiNote = 108;
@@ -98,7 +100,8 @@ int midiCCNumbers[numMidiBanks][numPots];
 const int minEditableMidiController = 0;
 const int maxEditableMidiController = 127;
 const int potSelectThreshold = 64;
-const int padCCVelocityPotChannel = 1; // Potentiometer 2 adjusts selected pad CC velocity/value.
+const int padCCReleaseValuePotChannel = 0; // Potentiometer 1 adjusts selected pad CC release value.
+const int padCCVelocityPotChannel = 1; // Potentiometer 2 adjusts selected pad CC press value.
 const int potMovingAverageSamples = 8;
 const int potAnalogDeadband = 8;
 const int potMidiDeadband = 1;
@@ -127,6 +130,7 @@ bool midiNoteEditMode = false;
 bool midiNoteMappingsSaved = false;
 int selectedMidiNote = 60;
 int selectedMuxCCVelocity = defaultMuxCCVelocity;
+int selectedMuxCCReleaseValue = defaultMuxCCReleaseValue;
 int selectedMessageType = MUX_MESSAGE_NOTE;
 int selectedEditTarget = EDIT_TARGET_NONE;
 int editedMuxChannel = -1;
@@ -204,11 +208,11 @@ void sendMuxPadPressMessage(int muxType, int muxValue, int velocity) {
   }
 }
 
-void sendMuxPadReleaseMessage(int muxType, int muxValue) {
+void sendMuxPadReleaseMessage(int muxType, int muxValue, int releaseValue) {
   if (muxType == MUX_MESSAGE_NOTE) {
     sendMidiMessage(MIDIMessageType::NoteOff, midiChannel, muxValue, 127);
   } else if (muxType == MUX_MESSAGE_CONTROL_CHANGE) {
-    sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, muxValue, 0);
+    sendMidiMessage(MIDIMessageType::ControlChange, midiChannel, muxValue, releaseValue);
   }
 }
 
@@ -287,7 +291,7 @@ void printCurrentMidiEditScreen(bool saved) {
   char targetText[20] = "";
   if (selectedEditTarget == EDIT_TARGET_PAD && editedMuxChannel >= 0) {
     if (selectedMessageType == MUX_MESSAGE_CONTROL_CHANGE) {
-      snprintf(targetText, sizeof(targetText), "Pad:%02d V:%03d", editedMuxChannel + 1, selectedMuxCCVelocity);
+      snprintf(targetText, sizeof(targetText), "Pad:%02d P:%03d R:%03d", editedMuxChannel + 1, selectedMuxCCVelocity, selectedMuxCCReleaseValue);
     } else {
       snprintf(targetText, sizeof(targetText), "Pad:%02d", editedMuxChannel + 1);
     }
@@ -360,6 +364,8 @@ void loadMuxMidiNotes() {
       muxMessageTypes[bank][channel] = wrapMuxMessageType(midiNotePreferences.getUChar(key, MUX_MESSAGE_NOTE));
       snprintf(key, sizeof(key), "b%dv%02d", bank, channel);
       muxCCVelocities[bank][channel] = constrainMidiDataValue(midiNotePreferences.getUChar(key, defaultMuxCCVelocity));
+      snprintf(key, sizeof(key), "b%dr%02d", bank, channel);
+      muxCCReleaseValues[bank][channel] = constrainMidiDataValue(midiNotePreferences.getUChar(key, defaultMuxCCReleaseValue));
       muxMidiNotes[bank][channel] = constrain(muxMidiNotes[bank][channel],
                                               valueMinimumForType(muxMessageTypes[bank][channel], EDIT_TARGET_PAD),
                                               valueMaximumForType(muxMessageTypes[bank][channel], EDIT_TARGET_PAD));
@@ -389,6 +395,7 @@ void saveMuxMidiNotes() {
     muxMidiNotes[midiChannel][editedMuxChannel] = constrainSelectedValue(selectedMidiNote);
     muxMessageTypes[midiChannel][editedMuxChannel] = wrapMuxMessageType(selectedMessageType);
     muxCCVelocities[midiChannel][editedMuxChannel] = constrainMidiDataValue(selectedMuxCCVelocity);
+    muxCCReleaseValues[midiChannel][editedMuxChannel] = constrainMidiDataValue(selectedMuxCCReleaseValue);
   } else if (selectedEditTarget == EDIT_TARGET_POT && editedPotChannel >= 0) {
     midiCCNumbers[midiChannel][editedPotChannel] = constrainSelectedValue(selectedMidiNote);
     selectedMessageType = MUX_MESSAGE_CONTROL_CHANGE;
@@ -412,6 +419,8 @@ void saveMuxMidiNotes() {
       midiNotePreferences.putUChar(key, static_cast<uint8_t>(wrapMuxMessageType(muxMessageTypes[bank][channel])));
       snprintf(key, sizeof(key), "b%dv%02d", bank, channel);
       midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrainMidiDataValue(muxCCVelocities[bank][channel])));
+      snprintf(key, sizeof(key), "b%dr%02d", bank, channel);
+      midiNotePreferences.putUChar(key, static_cast<uint8_t>(constrainMidiDataValue(muxCCReleaseValues[bank][channel])));
     }
 
     for (int channel = 0; channel < numPots; channel++) {
@@ -442,6 +451,7 @@ void enterMidiNoteEditMode() {
   selectedEditTarget = EDIT_TARGET_NONE;
   selectedMidiNote = constrain(muxMidiNotes[midiChannel][0], minEditableMidiNote, maxEditableMidiNote);
   selectedMuxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][0]);
+  selectedMuxCCReleaseValue = constrainMidiDataValue(muxCCReleaseValues[midiChannel][0]);
   selectedMessageType = wrapMuxMessageType(muxMessageTypes[midiChannel][0]);
   editedMuxChannel = -1;
   editedPotChannel = -1;
@@ -620,6 +630,7 @@ void handleMidiNoteEditMode() {
       selectedMessageType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
       selectedMidiNote = constrainSelectedValue(muxMidiNotes[midiChannel][channel]);
       selectedMuxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
+      selectedMuxCCReleaseValue = constrainMidiDataValue(muxCCReleaseValues[midiChannel][channel]);
       lastEditEncoder1Position = rotaryEncoder1.readEncoder();
       lastEditEncoder2Position = rotaryEncoder2.readEncoder();
       midiNoteMappingsSaved = false;
@@ -634,18 +645,31 @@ void handleMidiNoteEditMode() {
 
   for (int channel = 0; channel < numPots; channel++) {
     int currentPotValue = readPotentiometer(channel);
+    bool editingPadCCReleaseValue = selectedEditTarget == EDIT_TARGET_PAD &&
+                                    selectedMessageType == MUX_MESSAGE_CONTROL_CHANGE &&
+                                    channel == padCCReleaseValuePotChannel;
     bool editingPadCCVelocity = selectedEditTarget == EDIT_TARGET_PAD &&
                                 selectedMessageType == MUX_MESSAGE_CONTROL_CHANGE &&
                                 channel == padCCVelocityPotChannel;
 
-    if (editingPadCCVelocity) {
+    if (editingPadCCReleaseValue) {
+      int currentReleaseValue = midiDataValueFromPot(currentPotValue);
+      if (currentReleaseValue != selectedMuxCCReleaseValue) {
+        selectedMuxCCReleaseValue = currentReleaseValue;
+        midiNoteMappingsSaved = false;
+        printCurrentMidiEditScreen(false);
+#if DEBUG
+        Serial.print("Pad CC release value -> "); Serial.println(selectedMuxCCReleaseValue);
+#endif
+      }
+    } else if (editingPadCCVelocity) {
       int currentVelocity = midiDataValueFromPot(currentPotValue);
       if (currentVelocity != selectedMuxCCVelocity) {
         selectedMuxCCVelocity = currentVelocity;
         midiNoteMappingsSaved = false;
         printCurrentMidiEditScreen(false);
 #if DEBUG
-        Serial.print("Pad CC velocity -> "); Serial.println(selectedMuxCCVelocity);
+        Serial.print("Pad CC press value -> "); Serial.println(selectedMuxCCVelocity);
 #endif
       }
     } else if (abs(currentPotValue - lastEditPotValues[channel]) >= potSelectThreshold) {
@@ -844,6 +868,13 @@ void loop() {
                                valueMaximumForType(muxType, EDIT_TARGET_PAD));
       int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
 
+      int muxType = wrapMuxMessageType(muxMessageTypes[midiChannel][channel]);
+      int muxValue = constrain(muxMidiNotes[midiChannel][channel],
+                               valueMinimumForType(muxType, EDIT_TARGET_PAD),
+                               valueMaximumForType(muxType, EDIT_TARGET_PAD));
+      int muxCCVelocity = constrainMidiDataValue(muxCCVelocities[midiChannel][channel]);
+      int muxCCReleaseValue = constrainMidiDataValue(muxCCReleaseValues[midiChannel][channel]);
+
       if (!previousState && currentState) {
         int pressVelocity = (muxType == MUX_MESSAGE_CONTROL_CHANGE) ? muxCCVelocity : currentMuxPadVelocities[channel];
         sendMuxPadPressMessage(muxType, muxValue, pressVelocity);
@@ -852,7 +883,7 @@ void loop() {
         Serial.print(" pressed on MIDI channel "); Serial.println(midiChannel);
 #endif
       } else if (previousState && !currentState) {
-        sendMuxPadReleaseMessage(muxType, muxValue);
+        sendMuxPadReleaseMessage(muxType, muxValue, muxCCReleaseValue);
       }
     }
     previousMuxValues = currentMuxValues;
